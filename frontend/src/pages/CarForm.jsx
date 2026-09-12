@@ -337,7 +337,7 @@ export default function CarForm() {
                     </label>
                 </section>
 
-                <div className="form-actions">
+                <div className="form-actions" id="randomid">
                     <button className="btn btn--ghost" type="button" onClick={() => navigate('/')}>Anulează</button>
                     <button className="btn btn--primary" type="submit" disabled={saving}>
                         {saving ? 'Se salvează…' : isEdit ? 'Salvează modificările' : 'Adaugă mașina'}
