@@ -5,10 +5,20 @@
   "compatibility_date": "2024-12-01",
   "compatibility_flags": ["nodejs_compat"],
 
-  // Fișierele statice (logo, poze hero/galerie, tbi_banner) servite la /assets
+  // ── Fișiere statice ───────────────────────────────────────────────────────
+  //  ⚠️ IMPORTANT: Cloudflare servește fișierele din `directory` ÎNAINTE de
+  //  Worker. Dacă există `public/index.html`, el e servit la `/` și Worker-ul
+  //  nu mai e apelat — pagina de acasă nu apare niciodată.
+  //
+  //  În `public/` trebuie să existe DOAR folderul `assets/` cu imaginile:
+  //    logo.png, landing1-5.jpeg, g1-8.jpeg, tbi_banner.png, tbi_logo.png
+  //
+  //  `not_found_handling: "none"` = orice cale care nu e fișier real cade la
+  //  Worker (exact ce vrem: toate paginile sunt randate de Hono).
   "assets": {
     "directory": "./public",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    "not_found_handling": "none"
   },
 
   // ── D1 (baza de date) ──
@@ -23,7 +33,7 @@
   // ── Variabile publice (nu secrete) ──
   "vars": {
     "NODE_ENV": "production",
-    "B2_ENDPOINT": "https://s3.eu-central-003.backblazeb2.com",
+    "B2_ENDPOINT": "https://s3.us-west-004.backblazeb2.com",
     "B2_BUCKET_NAME": "vanzariautopark-media"
   }
 
