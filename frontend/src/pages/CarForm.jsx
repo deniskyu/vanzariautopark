@@ -69,7 +69,7 @@ export default function CarForm() {
                         for_dismantling: !!c.for_dismantling, description: c.description || '',
                         phone: c.phone || '', status: c.status || 'published',
                     });
-                    setMedia((c.media || []).map((m) => ({ id: m.id, ext: m.ext, w: m.w, h: m.h })));
+                    setMedia((c.media || []).map((m) => ({ id: m.id, ext: m.ext, w: m.w, h: m.h, dir: m.dir })));
                 }
             } catch (err) {
                 setToast({ type: 'err', message: err.message });
