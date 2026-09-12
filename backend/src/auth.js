@@ -55,8 +55,8 @@ export const createSession = async (c, db) => {
     const isProd = (c.env.NODE_ENV || 'production') === 'production';
     setCookie(c, COOKIE_NAME, token, {
         httpOnly: true,
-        sameSite: 'Lax',
-        secure: isProd,
+        sameSite: 'None',
+        secure: true,
         path: '/',
         maxAge: SESSION_DAYS * 24 * 3600,
     });
