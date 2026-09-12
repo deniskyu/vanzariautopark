@@ -33,7 +33,7 @@
   // ── Variabile publice (nu secrete) ──
   "vars": {
     "NODE_ENV": "production",
-    "B2_ENDPOINT": "https://s3.us-west-004.backblazeb2.com",
+    "B2_ENDPOINT": "https://s3.eu-central-003.backblazeb2.com",
     "B2_BUCKET_NAME": "vanzariautopark-media"
   }
 
