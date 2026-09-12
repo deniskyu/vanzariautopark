@@ -185,7 +185,17 @@ app.get('/stoc', async (c) => {
     }
 
     const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-    return c.html(renderStoc(site, { cars, total, page, pages, q }));
+
+    // Mărcile care există efectiv în stoc (published), pentru filtru.
+    let availableBrands = [];
+    try {
+        const { results } = await c.env.DB.prepare(
+            "SELECT DISTINCT brand FROM cars WHERE status = 'published' ORDER BY brand"
+        ).all();
+        availableBrands = (results || []).map((r) => r.brand);
+    } catch { /* fallback: toate mărcile */ }
+
+    return c.html(renderStoc(site, { cars, total, page, pages, q, availableBrands }));
 });
 
 // ── PAGINA UNEI MAȘINI ───────────────────────────────────────────────────────

@@ -94,7 +94,7 @@ ${Header(site, 'home')}
 
   <!-- ── BANNER TBI (mare, 90% lățime) ─────────────────────────────────── -->
   <div class="tbi-banner">
-    <img src="/assets/tbi_banner.png" alt="Finanțare în rate prin TBI Bank"
+    <img src="/assets/tbi_banner.jpeg" alt="Finanțare în rate prin TBI Bank"
          width="1100" height="380" loading="lazy">
   </div>
 

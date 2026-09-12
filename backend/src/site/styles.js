@@ -137,7 +137,7 @@ h3{font-size:clamp(1.15rem,1rem + .6vw,1.45rem)}
 }
 .header-inner{display:flex;align-items:center;gap:1rem;min-height:68px}
 .brand{display:flex;align-items:center;gap:.7rem;flex:1;min-width:0}
-.brand-logo{height:44px;width:auto;flex-shrink:0}
+.brand-logo{height:44px;width:auto;flex-shrink:0;border-radius:12px}
 .brand-name{font-family:var(--font-display);font-weight:800;font-size:1.05rem;
   line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
@@ -274,7 +274,7 @@ h3{font-size:clamp(1.15rem,1rem + .6vw,1.45rem)}
 .footer-grid{display:grid;gap:2rem;grid-template-columns:1fr}
 @media(min-width:700px){.footer-grid{grid-template-columns:1.4fr 1fr 1fr}}
 .footer-brand{display:flex;align-items:center;gap:.75rem;margin-bottom:.9rem}
-.footer-brand img{height:46px;width:auto}
+.footer-brand img{height:46px;width:auto;border-radius:12px}
 .site-footer h4{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;
   color:var(--muted-2);margin-bottom:.85rem;font-weight:800}
 .footer-list li{margin-bottom:.55rem;font-size:.93rem}

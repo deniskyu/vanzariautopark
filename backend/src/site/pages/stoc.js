@@ -14,7 +14,7 @@ import { Layout } from '../layout.js';
 import { Header, Footer, StickyWhatsApp, CarCard } from '../components.js';
 import { Filters, StockBar, Pagination } from '../blocks.js';
 
-export const renderStoc = (site, { cars, total, page, pages, q }) => {
+export const renderStoc = (site, { cars, total, page, pages, q, availableBrands }) => {
     // Titlu adaptat la filtrul de marcă, pentru SEO.
     const brandFilter = q.brand ? ` ${q.brand}` : '';
     const heading = q.brand
@@ -41,7 +41,7 @@ ${Header(site, 'stoc')}
       <h1>Mașini${brandFilter} de vânzare în Botoșani</h1>
     </div>
 
-    ${Filters(q)}
+    ${Filters(q, availableBrands)}
 
     ${total > 0 ? html`
       ${StockBar(total, q)}

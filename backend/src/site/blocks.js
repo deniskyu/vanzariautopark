@@ -16,7 +16,9 @@ import { BRANDS, POLLUTION_STANDARDS, ENGINE_CAPACITIES, YEARS } from '../data/c
 // ── Filtrele de căutare ──────────────────────────────────────────────────────
 //  `q` = obiectul cu valorile curente din URL (ce a cerut utilizatorul), ca să
 //  le repopulăm în formular după căutare.
-export const Filters = (q = {}) => {
+export const Filters = (q = {}, availableBrands = null) => {
+    // Dacă avem lista mărcilor din stoc, o folosim pe aia; altfel toate.
+    const brandList = (availableBrands && availableBrands.length) ? availableBrands : BRANDS;
     const sel = (v, cur) => (String(v) === String(cur) ? raw(' selected') : '');
 
     return html`
@@ -27,7 +29,7 @@ export const Filters = (q = {}) => {
       <label for="f-brand">Marcă</label>
       <select id="f-brand" name="brand">
         <option value="">Toate mărcile</option>
-        ${BRANDS.map((b) => html`<option value="${b}"${sel(b, q.brand)}>${b}</option>`)}
+        ${brandList.map((b) => html`<option value="${b}"${sel(b, q.brand)}>${b}</option>`)}
       </select>
     </div>
 

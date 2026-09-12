@@ -85,8 +85,7 @@ export const FUEL_TYPES = [
 
 export const BODY_TYPES = [
     'Berlină', 'Break', 'Hatchback', 'SUV', 'Coupe',
-    'Cabrio', 'Monovolum', 'Pick-up', 'Off-road', 'Van', 'Roadster', 'Limuzină', 'Microcar', 
-    'Minivan', 'Altul', 
+    'Cabrio', 'Monovolum', 'Pick-up', 'Off-road',
 ];
 
 export const TRANSMISSIONS = ['Manuală', 'Automată'];
@@ -94,7 +93,7 @@ export const TRANSMISSIONS = ['Manuală', 'Automată'];
 export const DRIVETRAINS = ['Față', 'Spate', 'Integrală (4x4)'];
 
 export const POLLUTION_STANDARDS = [
-    'Non-Euro', 'Euro 1', 'Euro 2', 'Euro 3', 'Euro 4', 'Euro 5', 'Euro 6', 'Hibrid', 'Electric', 'Altul',
+    'Non-Euro', 'Euro 1', 'Euro 2', 'Euro 3', 'Euro 4', 'Euro 5', 'Euro 6',
 ];
 
 export const COLORS = [
@@ -113,14 +112,14 @@ export const STEERING = [
     { value: 'right', label: 'Dreapta' },
 ];
 
-// carOptions.js
-export const MIN_YEAR = 1990; // același prag ca în validateCar
-
-const currentYear = new Date().getFullYear();
-export const YEARS = Array.from(
-    { length: currentYear - MIN_YEAR + 1 },
-    (_, i) => currentYear - i
-);
+// Anul de fabricație: de la anul curent, 90 în urmă. Recalculat la fiecare
+// pornire, deci nu îmbătrânește niciodată.
+// Anul curent, cu gardă: dacă ceasul dă ceva aberant (Worker cu deploy vechi a
+// dat cândva 1970, un device cu ceas stricat a dat listă goală), cădem pe o
+// valoare fixă rezonabilă. Serverul rămâne autoritatea la validare oricum.
+const _rawYear = new Date().getFullYear();
+export const currentYear = (_rawYear >= 2024 && _rawYear <= 2100) ? _rawYear : 2026;
+export const YEARS = Array.from({ length: 91 }, (_, i) => currentYear - i);
 
 // Limitele de caractere. Folosite ȘI la validarea din admin (contor + blocare),
 // ȘI la validarea pe server.
