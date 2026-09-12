@@ -143,7 +143,7 @@ const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
 
 export const CarCard = (car, site) => {
     const cover = Array.isArray(car.media) && car.media[0]
-        ? `/media/cars/${car.id}/${car.media[0].id}.${car.media[0].ext || 'jpg'}`
+        ? `/media/cars/${car.media[0].dir || car.id}/${car.media[0].id}.${car.media[0].ext || 'jpg'}`
         : null;
     const isSold = car.status === 'sold';
     const waText = `Bună ziua! Sunt interesat de ${car.title} (${fmtPrice(car.price)} €) de pe site.`;

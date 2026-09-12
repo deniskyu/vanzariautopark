@@ -24,7 +24,7 @@ import { formatPhoneDisplay, telHref } from '../../lib/carUtils.js';
 
 const fmt = (n) => new Intl.NumberFormat('de-DE').format(n);
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
-const mediaUrl = (carId, m) => `/media/cars/${carId}/${m.id}.${m.ext || 'jpg'}`;
+const mediaUrl = (carId, m) => `/media/cars/${m.dir || carId}/${m.id}.${m.ext || 'jpg'}`;
 
 export const renderMasina = (site, car) => {
     const media = Array.isArray(car.media) ? car.media : [];

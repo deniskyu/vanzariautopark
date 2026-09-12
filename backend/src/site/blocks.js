@@ -153,8 +153,8 @@ export const Pagination = (page, pages, q = {}) => {
     return html`
 <nav class="pagination" aria-label="Paginare">
   ${page > 1
-        ? html`<a href="${buildUrl(page - 1)}" aria-label="Pagina anterioară">${raw(icon('arrow', 16))}</a>`
-        : html`<span class="is-disabled" aria-hidden="true">${raw(icon('arrow', 16))}</span>`}
+        ? html`<a href="${buildUrl(page - 1)}" aria-label="Pagina anterioară" style="transform:scaleX(-1)">${raw(icon('arrow', 16))}</a>`
+        : html`<span class="is-disabled" aria-hidden="true" style="transform:scaleX(-1)">${raw(icon('arrow', 16))}</span>`}
 
   ${items.map((it) =>
         it === 'gap'
@@ -164,8 +164,8 @@ export const Pagination = (page, pages, q = {}) => {
                 : html`<a href="${buildUrl(it)}">${it}</a>`)}
 
   ${page < pages
-        ? html`<a href="${buildUrl(page + 1)}" aria-label="Pagina următoare" style="transform:scaleX(-1)">${raw(icon('arrow', 16))}</a>`
-        : html`<span class="is-disabled" aria-hidden="true" style="transform:scaleX(-1)">${raw(icon('arrow', 16))}</span>`}
+        ? html`<a href="${buildUrl(page + 1)}" aria-label="Pagina următoare">${raw(icon('arrow', 16))}</a>`
+        : html`<span class="is-disabled" aria-hidden="true">${raw(icon('arrow', 16))}</span>`}
 </nav>`;
 };
 

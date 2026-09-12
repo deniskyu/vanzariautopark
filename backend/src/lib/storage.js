@@ -132,7 +132,10 @@ export const deleteCarMedia = async (env, carId, mediaList) => {
     // Le ștergem în paralel; niciun eșec nu blochează restul.
     await Promise.all(items.map(async (m) => {
         if (!m || !m.id) return;
-        const key = `cars/${carId}/${m.id}.${m.ext || 'jpg'}`;
+        // Fiecare poză știe folderul ei real din B2 (`dir`). Cădem pe carId
+        // doar pentru anunțuri vechi care n-au `dir` salvat.
+        const folder = m.dir || carId;
+        const key = `cars/${folder}/${m.id}.${m.ext || 'jpg'}`;
         if (await deleteObject(env, key)) deleted++;
     }));
     return deleted;

@@ -20,7 +20,7 @@ const MAX_PHOTOS = 20;
 export default function PhotoUploader({ draftId, initial = [], onChange, apiBase = '' }) {
     // Pozele deja urcate (din editare) vin ca { id, ext, w, h }.
     const [photos, setPhotos] = useState(() =>
-        initial.map((m) => ({ ...m, status: 'done', progress: 100 }))
+        initial.map((m) => ({ ...m, dir: m.dir || m.car_id, status: 'done', progress: 100 }))
     );
     const [error, setError] = useState('');
     const inputRef = useRef(null);
@@ -29,11 +29,11 @@ export default function PhotoUploader({ draftId, initial = [], onChange, apiBase
     // Anunță formularul-părinte lista curentă (doar pozele gata, în ordine).
     const emit = useCallback((list) => {
         onChange(list.filter((p) => p.status === 'done').map((p) => ({
-            id: p.id, ext: p.ext, w: p.w, h: p.h,
+            id: p.id, ext: p.ext, w: p.w, h: p.h, dir: p.dir || p.car_id,
         })));
     }, [onChange]);
 
-    const urlOf = (p) => p.url || `${apiBase}/media/cars/${p.car_id || draftId}/${p.id}.${p.ext || 'jpg'}`;
+    const urlOf = (p) => p.url || `${apiBase}/media/cars/${p.dir || p.car_id || draftId}/${p.id}.${p.ext || 'jpg'}`;
 
     const handleFiles = async (fileList) => {
         setError('');
@@ -69,7 +69,7 @@ export default function PhotoUploader({ draftId, initial = [], onChange, apiBase
                     const next = prev.map((p) =>
                         p.tmpId === tmpId
                             ? { id: res.media.id, ext: res.media.ext, w: res.media.w, h: res.media.h,
-                                car_id: res.media.car_id, status: 'done', progress: 100 }
+                                dir: res.media.car_id, car_id: res.media.car_id, status: 'done', progress: 100 }
                             : p);
                     emit(next);
                     return next;
