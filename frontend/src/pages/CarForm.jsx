@@ -152,7 +152,7 @@ export default function CarForm() {
             <select value={f[k]} onChange={(ev) => (onChange || ((v) => set(k, v)))(ev.target.value)}>
                 <option value="">Alege…</option>
                 {(list || []).map((o) =>
-                    typeof o === 'string'
+                    typeof o === 'string' || typeof o === 'number'
                         ? <option key={o} value={o}>{o}</option>
                         : <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>

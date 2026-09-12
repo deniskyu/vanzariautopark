@@ -92,7 +92,7 @@ media.get('/cars/:carId/:file', async (c) => {
     const { carId, file } = c.req.param();
 
     // Validare strictă a numelui — doar id.ext, fără căi.
-    if (!/^[a-f0-9]{24}\.(jpg|png|webp)$/.test(file) || !/^[a-zA-Z0-9]+$/.test(carId)) {
+    if (!/^[a-f0-9]{24}\.(jpg|png|webp)$/.test(file) || !/^[a-zA-Z0-9_-]+$/.test(carId)) {
         return c.notFound();
     }
 
