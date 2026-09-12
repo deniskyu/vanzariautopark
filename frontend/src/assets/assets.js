@@ -15,6 +15,7 @@ import landing5 from './landing5.jpeg';
 
 import logo from './logo.png';
 import tbi_logo from './tbi_logo.png';
+import tbi_banner from './tbi_banner.jpeg';
 
 export default {
     g1,
@@ -32,4 +33,5 @@ export default {
     landing5,
     logo,
     tbi_logo,
+    tbi_banner,
 }

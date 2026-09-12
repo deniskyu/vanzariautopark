@@ -1,0 +1,208 @@
+/* ============================================================================
+   src/styles/admin.css — stilul panoului de administrare
+   ----------------------------------------------------------------------------
+   Aceeași identitate ca site-ul public: negru/grafit cu accent galben #E5FB14.
+   Mobile-first — patronul adaugă mașini de pe telefon, în parc.
+   ========================================================================== */
+
+:root{
+  --bg:#0a0a0a; --surface:#141414; --surface-2:#1c1c1c;
+  --border:#262626; --border-strong:#333;
+  --text:#f5f5f5; --muted:#a1a1aa; --muted-2:#71717a;
+  --accent:#E5FB14; --accent-dark:#c4d800; --on-accent:#0a0a0a;
+  --danger:#f87171; --danger-bg:#2a1414; --danger-border:#4a2020;
+  --ok:#4ade80;
+  --radius:14px; --radius-sm:10px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --t:180ms cubic-bezier(.22,.61,.36,1);
+}
+*,*::before,*::after{box-sizing:border-box}
+body,h1,h2,h3,p,ul,figure{margin:0}
+ul{list-style:none;padding:0}
+img{display:block;max-width:100%}
+svg{display:inline-block;vertical-align:middle;flex-shrink:0}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:none}
+a{color:inherit;text-decoration:none}
+
+body{background:var(--bg);color:var(--text);font-family:var(--font);
+  font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+
+/* ── Butoane ───────────────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;
+  padding:.75rem 1.3rem;border-radius:999px;font-weight:700;font-size:.95rem;
+  min-height:46px;border:2px solid transparent;transition:transform var(--t),background var(--t),border-color var(--t)}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5;pointer-events:none}
+.btn--primary{background:var(--accent);color:var(--on-accent)}
+.btn--primary:hover{background:var(--accent-dark)}
+.btn--ghost{border-color:var(--border-strong);color:var(--text)}
+.btn--ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn--danger{background:var(--danger);color:#0a0a0a}
+.btn--sm{padding:.5rem .9rem;min-height:38px;font-size:.85rem}
+.btn--block{width:100%}
+
+/* ── Login ─────────────────────────────────────────────────────────────── */
+.login{min-height:100dvh;display:grid;place-items:center;padding:1.5rem}
+.login-card{width:100%;max-width:380px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius);padding:2rem 1.6rem}
+.login-logo{text-align:center;margin-bottom:1.6rem}
+.login-logo img{height:52px;width:auto;margin-inline:auto}
+.login-logo h1{font-size:1.1rem;margin-top:.7rem;color:var(--muted)}
+.field{margin-bottom:1rem}
+.field label{display:block;font-size:.85rem;font-weight:700;color:var(--muted);margin-bottom:.4rem}
+.field input,.field select,.field textarea{width:100%;padding:.8rem;min-height:48px;
+  background:var(--surface-2);border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm);color:var(--text);font-size:16px}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent)}
+.form-error{background:var(--danger-bg);border:1px solid var(--danger-border);
+  color:#f0a0a0;padding:.7rem .9rem;border-radius:var(--radius-sm);font-size:.9rem;margin-bottom:1rem}
+
+/* ── Layout admin ──────────────────────────────────────────────────────── */
+.admin{min-height:100dvh}
+.admin-header{position:sticky;top:0;z-index:40;background:rgba(10,10,10,.92);
+  border-bottom:1px solid var(--border);backdrop-filter:blur(12px)}
+.admin-header-in{display:flex;align-items:center;gap:1rem;
+  max-width:1100px;margin-inline:auto;padding:.8rem 1rem;min-height:64px}
+.admin-brand{display:flex;align-items:center;gap:.6rem;flex:1;min-width:0}
+.admin-brand img{height:36px;width:auto}
+.admin-brand strong{font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.admin-nav{display:flex;gap:.4rem;align-items:center}
+.admin-nav a{padding:.5rem .9rem;border-radius:var(--radius-sm);font-size:.9rem;
+  font-weight:600;color:var(--muted);transition:color var(--t),background var(--t)}
+.admin-nav a:hover{color:var(--text)}
+.admin-nav a.active{color:var(--accent);background:var(--surface)}
+.admin-main{max-width:1100px;margin-inline:auto;padding:1.2rem 1rem 3rem}
+
+.page-head{display:flex;flex-wrap:wrap;gap:1rem;align-items:center;
+  justify-content:space-between;margin-bottom:1.4rem}
+.page-head h1{font-size:1.4rem}
+
+/* ── Bara de filtre listă ──────────────────────────────────────────────── */
+.list-tools{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:1.2rem}
+.list-search{flex:1;min-width:200px;position:relative}
+.list-search input{width:100%;padding:.7rem .9rem;min-height:44px;
+  background:var(--surface);border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm);color:var(--text);font-size:16px}
+.list-filter select{padding:.7rem .9rem;min-height:44px;background:var(--surface);
+  border:1px solid var(--border-strong);border-radius:var(--radius-sm);color:var(--text);font-size:.9rem}
+
+/* ── Card de mașină în listă ───────────────────────────────────────────── */
+.car-list{display:grid;gap:.8rem;grid-template-columns:1fr}
+@media(min-width:640px){.car-list{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1000px){.car-list{grid-template-columns:repeat(3,1fr)}}
+.acar{display:flex;flex-direction:column;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;
+  transition:border-color var(--t)}
+.acar:hover{border-color:var(--border-strong)}
+.acar-media{position:relative;aspect-ratio:16/10;background:var(--surface-2)}
+.acar-media img{width:100%;height:100%;object-fit:cover}
+.acar-noimg{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  color:var(--muted-2);font-size:.85rem}
+.acar-status{position:absolute;top:.6rem;left:.6rem;padding:.25rem .6rem;
+  border-radius:999px;font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.acar-status.published{background:var(--accent);color:var(--on-accent)}
+.acar-status.draft{background:var(--surface-2);color:var(--muted);border:1px solid var(--border-strong)}
+.acar-status.sold{background:var(--danger);color:#0a0a0a}
+.acar-views{position:absolute;top:.6rem;right:.6rem;padding:.25rem .55rem;
+  border-radius:999px;font-size:.72rem;font-weight:700;background:rgba(0,0,0,.7);color:#fff;
+  display:flex;align-items:center;gap:.3rem;backdrop-filter:blur(4px)}
+.acar-body{padding:.85rem;display:flex;flex-direction:column;gap:.5rem;flex:1}
+.acar-title{font-size:.98rem;font-weight:700;line-height:1.3;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.acar-meta{display:flex;flex-wrap:wrap;gap:.3rem .6rem;color:var(--muted);font-size:.82rem}
+.acar-price{font-weight:800;color:var(--accent);font-size:1.05rem}
+.acar-actions{margin-top:auto;display:flex;gap:.5rem;padding-top:.4rem}
+.acar-actions .btn{flex:1}
+.acar-actions .icon-btn{flex:0 0 auto;width:38px;height:38px;padding:0;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--border-strong);border-radius:var(--radius-sm);color:var(--muted)}
+.acar-actions .icon-btn:hover{border-color:var(--danger);color:var(--danger)}
+
+/* ── Stări ─────────────────────────────────────────────────────────────── */
+.loading,.empty{text-align:center;padding:3rem 1rem;color:var(--muted)}
+.empty h2{color:var(--text);margin-bottom:.5rem}
+.spinner{width:34px;height:34px;border:3px solid var(--border-strong);
+  border-top-color:var(--accent);border-radius:50%;margin:0 auto 1rem;
+  animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Modal de confirmare ───────────────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.7);
+  display:flex;align-items:center;justify-content:center;padding:1.5rem;backdrop-filter:blur(3px)}
+.modal{background:var(--surface);border:1px solid var(--border-strong);
+  border-radius:var(--radius);padding:1.6rem;max-width:400px;width:100%}
+.modal h3{margin-bottom:.6rem}
+.modal p{color:var(--muted);margin-bottom:1.4rem}
+.modal-car{color:var(--text);font-weight:700}
+.modal-actions{display:flex;gap:.7rem}
+.modal-actions .btn{flex:1}
+
+/* ── Paginare ──────────────────────────────────────────────────────────── */
+.pager{display:flex;gap:.4rem;justify-content:center;align-items:center;margin-top:2rem}
+.pager button{min-width:42px;height:42px;padding:0 .7rem;border-radius:var(--radius-sm);
+  border:1px solid var(--border-strong);font-weight:700;color:var(--text);transition:border-color var(--t)}
+.pager button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.pager button:disabled{opacity:.4}
+.pager .current{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+
+/* ── Toast ─────────────────────────────────────────────────────────────── */
+.toast{position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);z-index:200;
+  padding:.8rem 1.4rem;border-radius:999px;font-weight:700;font-size:.9rem;
+  box-shadow:0 8px 28px rgba(0,0,0,.4);animation:toast-in var(--t)}
+.toast.ok{background:var(--accent);color:var(--on-accent)}
+.toast.err{background:var(--danger);color:#0a0a0a}
+@keyframes toast-in{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+
+/* ── Formular de mașină ────────────────────────────────────────────────── */
+.car-form{max-width:760px}
+.form-section{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:1.3rem;margin-bottom:1.2rem}
+.form-section h2{font-size:1.1rem;margin-bottom:1rem;color:var(--accent)}
+.form-row{display:grid;gap:1rem;grid-template-columns:1fr}
+@media(min-width:560px){.form-row{grid-template-columns:1fr 1fr}}
+.field .ch{float:right;color:var(--muted-2);font-style:normal;font-size:.78rem;font-weight:400}
+.field-hint{color:var(--muted);font-size:.85rem;margin-top:.5rem}
+.check{display:flex;align-items:center;gap:.6rem;margin-top:.9rem;cursor:pointer;font-size:.95rem}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+.status-pills{display:flex;gap:.6rem}
+.status-pill{padding:.6rem 1.2rem;border-radius:999px;border:2px solid var(--border-strong);
+  font-weight:700;font-size:.9rem;color:var(--muted);transition:all var(--t)}
+.status-pill.active{border-color:var(--accent);color:var(--accent);background:var(--surface-2)}
+.form-actions{display:flex;gap:.8rem;justify-content:flex-end;position:sticky;bottom:0;
+  background:linear-gradient(transparent,var(--bg) 30%);padding:1rem 0;margin-top:1.5rem}
+.form-actions .btn{flex:1}
+@media(min-width:560px){.form-actions .btn{flex:0 0 auto;min-width:150px}}
+
+/* ── Uploader de poze ──────────────────────────────────────────────────── */
+.uploader-head{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:space-between;
+  align-items:center;margin-bottom:.8rem}
+.uploader-count{font-weight:700}
+.uploader-hint{color:var(--muted-2);font-size:.82rem}
+.photo-grid{display:grid;gap:.6rem;grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
+.photo,.photo-add{position:relative;aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden}
+.photo{background:var(--surface-2);border:1px solid var(--border-strong)}
+.photo img{width:100%;height:100%;object-fit:cover}
+.photo.is-error{border-color:var(--danger)}
+.photo-cover{position:absolute;bottom:0;left:0;right:0;padding:.2rem;text-align:center;
+  background:var(--accent);color:var(--on-accent);font-size:.68rem;font-weight:800;text-transform:uppercase}
+.photo-del{position:absolute;top:.3rem;right:.3rem;width:26px;height:26px;border-radius:50%;
+  background:rgba(0,0,0,.75);color:#fff;font-size:.85rem;display:flex;align-items:center;justify-content:center}
+.photo-del:hover{background:var(--danger)}
+.photo-uploading{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:.5rem;padding:.6rem}
+.photo-bar{width:80%;height:5px;background:var(--border-strong);border-radius:3px;overflow:hidden}
+.photo-bar span{display:block;height:100%;background:var(--accent);transition:width .2s}
+.photo-pct{font-size:.75rem;font-weight:700;color:var(--muted)}
+.photo-err{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  color:var(--danger);font-size:.8rem;font-weight:700}
+.photo-add{border:2px dashed var(--border-strong);background:var(--surface);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3rem;
+  color:var(--muted);font-size:.8rem;transition:border-color var(--t),color var(--t)}
+.photo-add:hover{border-color:var(--accent);color:var(--accent)}
+.photo-add-plus{font-size:1.6rem;line-height:1}
+
+/* ── Editor servicii (setări) ──────────────────────────────────────────── */
+.svc-edit{background:var(--surface-2);border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm);padding:1rem;margin-bottom:.9rem}
+.svc-edit:last-child{margin-bottom:0}
