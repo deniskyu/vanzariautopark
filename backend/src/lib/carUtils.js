@@ -8,7 +8,7 @@
 import {
     BRANDS, ENGINE_CAPACITIES, FUEL_TYPES, BODY_TYPES, TRANSMISSIONS,
     DRIVETRAINS, POLLUTION_STANDARDS, COLORS, REGISTRATION_STATUS, STEERING,
-    LIMITS, isAllowed, MIN_YEAR, 
+    LIMITS, isAllowed,
 } from '../data/carOptions.js';
 
 // ─── Slug ────────────────────────────────────────────────────────────────────
