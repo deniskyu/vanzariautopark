@@ -1,0 +1,32 @@
+{
+  // ── Configurația Worker-ului (backend + site public) ──────────────────────
+  "name": "vanzariautopark",
+  "main": "src/index.js",
+  "compatibility_date": "2024-12-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Fișierele statice (logo, poze hero/galerie, tbi_banner) servite la /assets
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+
+  // ── D1 (baza de date) ──
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "autopark_db",
+      "database_id": "ac784e2c-1d83-4dae-993b-8318e644d113"
+    }
+  ],
+
+  // ── Variabile publice (nu secrete) ──
+  "vars": {
+    "NODE_ENV": "production",
+    "B2_ENDPOINT": "https://s3.us-west-004.backblazeb2.com",
+    "B2_BUCKET_NAME": "vanzariautopark-media"
+  }
+
+  // Secretele (ADMIN_PASSWORD, ADMIN_ORIGIN, B2_ACCESS_KEY_ID,
+  // B2_SECRET_ACCESS_KEY) se pun cu `wrangler secret put`, NU aici.
+}
