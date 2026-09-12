@@ -42,7 +42,7 @@ export const renderMasina = (site, car) => {
            width="${media[0].w || 800}" height="${media[0].h || 600}"
            fetchpriority="high" data-index="0">
       ${media.length > 1 ? html`
-        <button class="gal-nav gal-prev" id="gal-prev" aria-label="Poza anterioară">${raw(icon('arrow', 20))}</button>
+        <button class="gal-nav gal-prev" id="gal-prev" aria-label="Poza anterioară" style="transform: scaleX(-1)">${raw(icon('arrow', 20))}</button>
         <button class="gal-nav gal-next" id="gal-next" aria-label="Poza următoare">${raw(icon('arrow', 20))}</button>
         <span class="gal-counter"><span id="gal-num">1</span> / ${media.length}</span>
       ` : ''}
@@ -68,7 +68,7 @@ ${hasImg ? html`
   </div>
   <button class="lb-close" id="lb-close" aria-label="Închide">${raw(icon('close', 22))}</button>
   ${media.length > 1 ? html`
-    <button class="lb-nav lb-prev" id="lb-prev" aria-label="Anterioara">${raw(icon('arrow', 22))}</button>
+    <button class="lb-nav lb-prev" id="lb-prev" aria-label="Anterioara" style="transform: scaleX(-1)">${raw(icon('arrow', 22))}</button>
     <button class="lb-nav lb-next" id="lb-next" aria-label="Următoarea">${raw(icon('arrow', 22))}</button>
     <span class="lb-counter"><span id="lb-num">1</span> / ${media.length}</span>
   ` : ''}
