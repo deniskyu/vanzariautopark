@@ -113,9 +113,14 @@ export const STEERING = [
     { value: 'right', label: 'Dreapta' },
 ];
 
+// carOptions.js
+export const MIN_YEAR = 1990; // același prag ca în validateCar
+
 const currentYear = new Date().getFullYear();
-// Generează anii descrescător, de la anul curent până la 1990 (poți schimba 1989 dacă vrei mai vechi)
-export const YEARS = Array.from({ length: currentYear - 1989 }, (_, i) => currentYear - i);
+export const YEARS = Array.from(
+    { length: currentYear - MIN_YEAR + 1 },
+    (_, i) => currentYear - i
+);
 
 // Limitele de caractere. Folosite ȘI la validarea din admin (contor + blocare),
 // ȘI la validarea pe server.

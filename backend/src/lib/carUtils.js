@@ -8,7 +8,7 @@
 import {
     BRANDS, ENGINE_CAPACITIES, FUEL_TYPES, BODY_TYPES, TRANSMISSIONS,
     DRIVETRAINS, POLLUTION_STANDARDS, COLORS, REGISTRATION_STATUS, STEERING,
-    LIMITS, isAllowed, currentYear,
+    LIMITS, isAllowed, MIN_YEAR 
 } from '../data/carOptions.js';
 
 // ─── Slug ────────────────────────────────────────────────────────────────────
@@ -102,8 +102,8 @@ export const validateCar = (body = {}) => {
 
     if (price === null || price <= 0) e.push('Prețul trebuie să fie un număr pozitiv.');
     if (mileage === null || mileage < 0) e.push('Kilometrajul trebuie să fie un număr.');
-    if (year === null || year < 1936 || year > currentYear + 1)
-        e.push(`Anul trebuie să fie între 1936 și ${currentYear + 1}.`);
+    if (year === null || year < MIN_YEAR || year > currentYear + 1)
+        e.push(`Anul trebuie să fie între ${MIN_YEAR} și ${currentYear + 1}.`);
     if (hp !== null && (hp < 0 || hp > 2000)) e.push('Puterea are o valoare nevalidă.');
 
     // Liste

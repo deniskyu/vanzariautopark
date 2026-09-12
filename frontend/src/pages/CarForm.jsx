@@ -2,7 +2,10 @@
 //  src/pages/CarForm.jsx — adăugare și editare mașină
 // ----------------------------------------------------------------------------
 //  Aceeași pagină pentru „nou" și „editare" (distinge după :id din rută).
-//  Opțiunile pentru dropdown-uri vin de la /admin/options (listele hardcodate).
+//  Majoritatea opțiunilor pentru dropdown-uri vin de la /admin/options.
+//  Excepție: anul de fabricație NU mai vine de acolo — se calculează direct
+//  în browser (vezi blocul „Anul de fabricație" de mai jos), ca să nu mai
+//  depindă de un Worker care poate rămâne cu o versiune veche redeploy-uită.
 //  Validarea se face și în client (feedback imediat) și pe server (autoritate).
 //
 //  La adăugare, pozele se urcă sub un draft_id temporar; la salvare, lista de
@@ -20,12 +23,50 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
 // id temporar de draft pentru pozele unei mașini noi
 const newDraftId = () => 'draft_' + Math.random().toString(36).slice(2, 10);
 
+// ─── Anul de fabricație: sursă vie + fallback fix ───────────────────────────
+// 1) cerem ceasul „adevărat" prin /cdn-cgi/trace (endpoint Cloudflare, prezent
+//    automat pe orice domeniu de pe Cloudflare, same-origin → fără CORS, fără
+//    cheie). Dacă merge, luăm anul de acolo și construim o fereastră de 101
+//    ani: [an, an-1, ..., an-100].
+// 2) dacă orice pas eșuează (rețea, timeout, ts lipsă din răspuns), cădem pe
+//    un interval fix 2040 → 1940, ca formularul să rămână mereu utilizabil.
+const YEAR_FETCH_TIMEOUT_MS = 2500;
+
+async function fetchServerYear() {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), YEAR_FETCH_TIMEOUT_MS);
+    try {
+        const res = await fetch('/cdn-cgi/trace', { signal: controller.signal });
+        if (!res.ok) throw new Error('trace indisponibil');
+        const text = await res.text();
+        const match = text.match(/^ts=(\d+)/m);
+        if (!match) throw new Error('ts lipsă din răspuns');
+        const year = new Date(Number(match[1]) * 1000).getUTCFullYear();
+        if (!Number.isFinite(year)) throw new Error('an invalid');
+        return year;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+const FALLBACK_YEARS = Array.from({ length: 2040 - 1940 + 1 }, (_, i) => 2040 - i);
+
+async function getYearsForForm() {
+    try {
+        const year = await fetchServerYear();
+        return Array.from({ length: 101 }, (_, i) => year - i);
+    } catch {
+        return FALLBACK_YEARS;
+    }
+}
+
 export default function CarForm() {
     const { id } = useParams();
     const isEdit = id && id !== 'nou';
     const navigate = useNavigate();
 
     const [options, setOptions] = useState(null);
+    const [years, setYears] = useState(null); // null = se încarcă încă
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState([]);
@@ -42,6 +83,13 @@ export default function CarForm() {
         for_dismantling: false, description: '', phone: '', status: 'published',
     });
     const set = (k, v) => setF((prev) => ({ ...prev, [k]: v }));
+
+    // anul de fabricație — independent de restul opțiunilor, nu blochează formularul
+    useEffect(() => {
+        let alive = true;
+        getYearsForForm().then((y) => { if (alive) setYears(y); });
+        return () => { alive = false; };
+    }, []);
 
     // încărcăm opțiunile + (la editare) mașina
     useEffect(() => {
@@ -82,6 +130,16 @@ export default function CarForm() {
     }, [id]);
 
     const limits = options?.limits || { title: 80, description: 4000 };
+
+    // dacă mașina editată are un an care nu mai intră în fereastra curentă
+    // (ex. o mașină foarte veche, sau discrepanță live vs. fallback), îl
+    // păstrăm oricum în listă, ca selectul controlat să nu rămână „orfan"
+    const yearOptions = useMemo(() => {
+        if (!years) return null;
+        const current = f.production_year ? Number(f.production_year) : null;
+        if (current && !years.includes(current)) return [current, ...years];
+        return years;
+    }, [years, f.production_year]);
 
     // combustibil electric ⇔ capacitate „Fără (Electric)"
     const onFuelChange = (v) => {
@@ -146,11 +204,12 @@ export default function CarForm() {
 
     if (loading) return <AdminLayout><Loading /></AdminLayout>;
 
-    const Sel = ({ label, k, list, onChange, required }) => (
+    const Sel = ({ label, k, list, onChange, required, disabled, placeholder }) => (
         <label className="field">
             <span>{label}{required && ' *'}</span>
-            <select value={f[k]} onChange={(ev) => (onChange || ((v) => set(k, v)))(ev.target.value)}>
-                <option value="">Alege…</option>
+            <select value={f[k]} disabled={disabled}
+                    onChange={(ev) => (onChange || ((v) => set(k, v)))(ev.target.value)}>
+                <option value="">{placeholder || 'Alege…'}</option>
                 {(list || []).map((o) =>
                     typeof o === 'string' || typeof o === 'number'
                         ? <option key={o} value={o}>{o}</option>
@@ -194,7 +253,9 @@ export default function CarForm() {
                     </label>
                     <div className="form-row">
                         <Sel label="Marcă" k="brand" list={options.brands} required />
-                        <Sel label="An fabricație" k="production_year" list={options.years} required />
+                        <Sel label="An fabricație" k="production_year" list={yearOptions}
+                             disabled={!yearOptions}
+                             placeholder={yearOptions ? 'Alege…' : 'Se încarcă…'} required />
                     </div>
                     <div className="form-row">
                         <label className="field">
