@@ -276,23 +276,6 @@ export default function CarForm() {
                     </label>
                 </section>
 
-                {/* ── Publicare ── */}
-                <section className="form-section">
-                    <h2>Publicare</h2>
-                    <div className="status-pills">
-                        {[['published', 'Publicat'], ['draft', 'Ciornă']].map(([v, label]) => (
-                            <button type="button" key={v}
-                                    className={`status-pill${f.status === v ? ' active' : ''}`}
-                                    onClick={() => set('status', v)}>{label}</button>
-                        ))}
-                    </div>
-                    <p className="field-hint">
-                        {f.status === 'published'
-                            ? 'Mașina apare imediat pe site.'
-                            : 'Ciorna e salvată, dar nu apare pe site până o publici.'}
-                    </p>
-                </section>
-
                 <div className="form-actions">
                     <button className="btn btn--ghost" type="button" onClick={() => navigate('/')}>Anulează</button>
                     <button className="btn btn--primary" type="submit" disabled={saving}>
