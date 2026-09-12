@@ -96,8 +96,8 @@ export default function CarList() {
                     <div className="car-list">
                         {cars.map((car) => {
                             const cover = car.media?.[0]
-                                ? `${import.meta.env.VITE_API_URL || ''}/media/cars/${car.id}/${car.media[0].id}.${car.media[0].ext || 'jpg'}`
-                                : null;
+                            ? `/media/cars/${car.id}/${car.media[0].id}.${car.media[0].ext || 'jpg'}`
+                            : null;
                             return (
                                 <article className="acar" key={car.id}>
                                     <div className="acar-media">
