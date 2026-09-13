@@ -63,31 +63,54 @@ export const createSession = async (c, db) => {
     setCookie(c, COOKIE_NAME, token, {
         httpOnly: true,
         secure: true,
-        sameSite: 'None',
+        sameSite: 'Lax',
         path: '/',
         maxAge: SESSION_DAYS * 24 * 3600,
     });
+
 
     return token;
 };
 
 
-/** Verifică sesiunea curentă. Șterge cookie-ul și rândul dacă a expirat. */
 export const readSession = async (c, db) => {
     const token = getCookie(c, COOKIE_NAME);
+
+    console.log(
+        '[AUTH]',
+        token
+            ? `cookie PRESENT (${token.length})`
+            : 'cookie MISSING'
+    );
+
     if (!token || token.length !== 64) return null;
 
-    const row = await db.prepare('SELECT token, expires_at FROM sessions WHERE token = ?')
-        .bind(token).first();
+    const row = await db
+        .prepare('SELECT token, expires_at FROM sessions WHERE token = ?')
+        .bind(token)
+        .first();
+
+    console.log('[AUTH] D1 row:', !!row);
+
     if (!row) return null;
 
     if (new Date(row.expires_at).getTime() < Date.now()) {
-        await db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
-        deleteCookie(c, COOKIE_NAME, { path: '/'});
+        console.log('[AUTH] EXPIRED');
+        await db.prepare(
+            'DELETE FROM sessions WHERE token = ?'
+        ).bind(token).run();
+
+        deleteCookie(c, COOKIE_NAME, {
+            path: '/',
+        });
+
         return null;
     }
+
+    console.log('[AUTH] VALID');
     return { token };
 };
+
 
 export const destroySession = async (c, db) => {
     const token = getCookie(c, COOKIE_NAME);
