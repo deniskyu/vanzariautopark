@@ -111,6 +111,11 @@ export const api = {
             xhr.send(blob);
         });
     },
+
+    // ── Media: ștergere imediată a unei singure poze ──
+    //  Apelat din PhotoUploader la „✕", înainte chiar de Salvează — previne
+    //  poze orfane în B2 (vezi comentariul din media.js, Stratul 1).
+    deleteMedia: (dir, filename) => request(`/admin/media/${dir}/${filename}`, { method: 'DELETE' }),
 };
 
 export default api;

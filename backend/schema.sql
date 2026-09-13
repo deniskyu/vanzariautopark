@@ -1,12 +1,13 @@
 -- ============================================================================
 --  schema.sql — structura bazei de date Cloudflare D1 (SQLite)
 -- ----------------------------------------------------------------------------
---  Trei tabele:
---    cars      — stocul de mașini
---    settings  — textele și datele editabile din panoul de admin
---    sessions  — sesiunile de login ale patronului
+--  Patru tabele:
+--    cars           — stocul de mașini
+--    settings       — textele și datele editabile din panoul de admin
+--    sessions       — sesiunile de login ale patronului
+--    media_uploads  — ledger pentru curățarea pozelor orfane din B2
 --
---  RULARE (o singură dată, la început):
+--  RULARE (o singură dată, la început; sigur de re-rulat oricând):
 --    wrangler d1 execute autopark_db --local  --file=./schema.sql   (pentru dev)
 --    wrangler d1 execute autopark_db --remote --file=./schema.sql   (pentru producție)
 --
@@ -136,3 +137,22 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+
+-- ── UPLOAD-URI DE MEDIA (ledger pentru curățarea pozelor orfane) ─────────────
+-- O înregistrare per fișier urcat cu succes (POST /api/admin/media), indiferent
+-- dacă ajunge sau nu atașat vreodată unei mașini salvate.
+--
+-- Cron job-ul din src/lib/sweep.js verifică periodic rândurile mai vechi de
+-- 24h: dacă id-ul pozei nu apare în coloana `media` a NICIUNEI mașini, o
+-- consideră abandonată (draft nesalvat, sau poză adăugată la editare și
+-- neconfirmată) și o șterge din B2. Rândul se șterge din acest tabel după
+-- fiecare verificare — indiferent de rezultat — deci tabelul rămâne mereu mic,
+-- nu crește la nesfârșit.
+CREATE TABLE IF NOT EXISTS media_uploads (
+    id          TEXT PRIMARY KEY,        -- media id (hex, vezi mediaId() în storage.js)
+    car_id      TEXT NOT NULL,           -- folderul din B2: draft_xxxx sau id-ul unei mașini existente
+    ext         TEXT NOT NULL,
+    uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_media_uploads_uploaded ON media_uploads(uploaded_at);

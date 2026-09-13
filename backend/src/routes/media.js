@@ -1,5 +1,5 @@
 // ============================================================================
-//  src/routes/media.js — upload, servire și ștergere de fotografii
+//  src/routes/media.js — upload, servire, ștergere și curățare de fotografii
 // ----------------------------------------------------------------------------
 //  Fluxul de upload al unei mașini, în doi pași:
 //    1. Panoul urcă fiecare poză (deja comprimată în browser) la
@@ -14,12 +14,19 @@
 //  Servirea: /media/cars/<car_id>/<media_id>.jpg — Worker-ul citește din B2 și
 //  întoarce fișierul cu cache lung. Cloudflare pune apoi în cache la edge, deci
 //  a doua cerere nici nu mai ajunge la Worker.
+//
+//  ── ORFANI ────────────────────────────────────────────────────────────────
+//  Fiecare upload reușit se înregistrează și în tabelul `media_uploads`
+//  (ledger). DELETE /api/admin/media/:carId/:file (Strat 1: userul apasă „✕"
+//  în formular, înainte de Salvează) șterge imediat din B2 + din ledger. Ce
+//  scapă de Stratul 1 (tab închis, upload urmat de eroare la salvare, etc.) e
+//  prins mai târziu de sweep-ul programat din src/lib/sweep.js (Strat 3).
 // ============================================================================
 
 import { Hono } from 'hono';
 import { requireAuth } from '../auth.js';
 import {
-    makeClient, mediaId, extFromType, sniffImage, putObject, carKey,
+    makeClient, mediaId, extFromType, sniffImage, putObject, deleteObject, carKey,
 } from '../lib/storage.js';
 import { LIMITS } from '../data/carOptions.js';
 
@@ -67,6 +74,19 @@ adminMedia.post('/', async (c) => {
     const okPut = await putObject(env, key, bytes, storeType);
     if (!okPut) return c.json({ ok: false, error: 'Eroare la stocarea imaginii.' }, 502);
 
+    // Înregistrăm în ledger, ca sweep-ul (Strat 3) să știe de acest fișier
+    // dacă nu ajunge niciodată atașat unei mașini salvate. Un eșec aici NU
+    // trebuie să strice uploadul — poza tot există corect în B2 — deci doar
+    // logăm; în cel mai rău caz, acest fișier nu va fi urmărit de sweep dacă
+    // rămâne orfan (dar oricum nu era orfan înainte să existe ledger-ul).
+    try {
+        await env.DB.prepare(
+            'INSERT INTO media_uploads (id, car_id, ext) VALUES (?, ?, ?)'
+        ).bind(id, carId, ext).run();
+    } catch (err) {
+        console.warn('[media] ledger insert:', err.message);
+    }
+
     const w = parseInt(c.req.query('w'), 10) || null;
     const h = parseInt(c.req.query('h'), 10) || null;
 
@@ -80,6 +100,33 @@ adminMedia.post('/', async (c) => {
             car_id: carId,   // panoul îl folosește să știe unde s-a pus
         },
     });
+});
+
+//  DELETE /api/admin/media/:carId/:file
+//  Ștergere imediată a UNEI singure poze (Strat 1) — apelată din PhotoUploader
+//  când userul apasă „✕", înainte chiar să salveze formularul. Fără asta,
+//  orice poză scoasă din formular înainte de Salvează rămânea orfană în B2
+//  pentru totdeauna (doar dispărea din lista trimisă la server).
+adminMedia.delete('/:carId/:file', async (c) => {
+    const env = c.env;
+    const { carId, file } = c.req.param();
+
+    if (!/^[a-f0-9]{24}\.(jpg|png|webp)$/.test(file) || !/^[a-zA-Z0-9_-]+$/.test(carId)) {
+        return c.json({ ok: false, error: 'Identificator invalid.' }, 400);
+    }
+
+    const key = `cars/${carId}/${file}`;
+    const okDel = await deleteObject(env, key);
+    if (!okDel) return c.json({ ok: false, error: 'Eroare la ștergerea imaginii.' }, 502);
+
+    // curățăm și rândul din ledger — best-effort, nu blocăm răspunsul dacă eșuează
+    const mediaIdPart = file.slice(0, file.lastIndexOf('.'));
+    c.executionCtx?.waitUntil?.(
+        env.DB.prepare('DELETE FROM media_uploads WHERE id = ?').bind(mediaIdPart).run()
+            .catch((err) => console.warn('[media] ledger delete:', err.message))
+    );
+
+    return c.json({ ok: true });
 });
 
 // ── SERVIRE (public) ─────────────────────────────────────────────────────────

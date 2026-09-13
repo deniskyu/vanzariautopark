@@ -9,6 +9,12 @@
 //
 //  Starea unei poze: { id, ext, w, h, url?, status: 'uploading'|'done'|'error',
 //                      progress, name }
+//
+//  ── ORFANI ────────────────────────────────────────────────────────────────
+//  O poză deja urcată (status: 'done') există fizic în B2. Dacă userul apasă
+//  „✕" înainte de Salvează, remove() trebuie să șteargă și din B2, nu doar
+//  din starea locală — altfel poza rămâne orfană acolo pentru totdeauna
+//  (Stratul 1 din strategia anti-orfani; vezi și media.js și cars.js).
 // ============================================================================
 
 import { useState, useCallback, useRef } from 'react';
@@ -85,8 +91,22 @@ export default function PhotoUploader({ draftId, initial = [], onChange, apiBase
 
     const remove = (target) => {
         setPhotos((prev) => {
+            const photo = prev.find((p) => (p.id || p.tmpId) === target);
             const next = prev.filter((p) => (p.id || p.tmpId) !== target);
             emit(next);
+
+            // Doar pozele deja urcate (status 'done') există fizic în B2 —
+            // un placeholder încă în upload sau unul cu eroare n-a apucat
+            // să ajungă acolo, sau uploadul chiar a eșuat.
+            if (photo?.status === 'done' && photo.id) {
+                const dir = photo.dir || photo.car_id || draftId;
+                const filename = `${photo.id}.${photo.ext || 'jpg'}`;
+                api.deleteMedia(dir, filename).catch((err) => {
+                    // Nu blocăm UI-ul dacă ștergerea eșuează (ex. rețea) — orfanul
+                    // rezultat e prins oricum mai târziu de sweep-ul programat.
+                    console.warn('[uploader] ștergere din B2 eșuată, va fi curățată de sweep:', err.message);
+                });
+            }
             return next;
         });
     };

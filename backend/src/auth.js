@@ -58,6 +58,7 @@ export const createSession = async (c, db) => {
         sameSite: 'None',
         secure: true,
         path: '/',
+        domain: '.vanzariautopark.com',
         maxAge: SESSION_DAYS * 24 * 3600,
     });
     return token;
@@ -74,7 +75,7 @@ export const readSession = async (c, db) => {
 
     if (new Date(row.expires_at).getTime() < Date.now()) {
         await db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
-        deleteCookie(c, COOKIE_NAME, { path: '/' });
+        deleteCookie(c, COOKIE_NAME, { path: '/', domain: '.vanzariautopark.com' });
         return null;
     }
     return { token };
@@ -83,7 +84,7 @@ export const readSession = async (c, db) => {
 export const destroySession = async (c, db) => {
     const token = getCookie(c, COOKIE_NAME);
     if (token) await db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
-    deleteCookie(c, COOKIE_NAME, { path: '/' });
+    deleteCookie(c, COOKIE_NAME, { path: '/', domain: '.vanzariautopark.com' });
 };
 
 /** Verifică parola trimisă contra secretului. */

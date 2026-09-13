@@ -10,6 +10,14 @@
 //    /api/cars/*         citire publică
 //    /media/*            (Batch 3)
 //    /*                  site public (Batch 5)
+//
+//  ── CRON ─────────────────────────────────────────────────────────────────
+//  Pe lângă `fetch` (cererile HTTP normale, gestionate de Hono), Worker-ul
+//  exportă și `scheduled` — apelat automat de Cloudflare la orele din
+//  `triggers.crons` (wrangler.jsonc). Rulează sweepOrphanedMedia(), care
+//  curăță din B2 pozele urcate și niciodată atașate unei mașini salvate
+//  (Stratul 3 din strategia anti-orfani; Straturile 1, 2 și 4 sunt deja în
+//  media.js și cars.js).
 // ============================================================================
 
 import { Hono } from 'hono';
@@ -27,6 +35,7 @@ import { renderContact } from './site/pages/contact.js';
 import { renderTermeni, renderConfidentialitate, renderCookies } from './site/pages/legal.js';
 import { BRANDS, POLLUTION_STANDARDS, ENGINE_CAPACITIES } from './data/carOptions.js';
 import { DEFAULT_SCHEDULE } from './site/components.js';
+import { sweepOrphanedMedia } from './lib/sweep.js';
 
 const app = new Hono();
 
@@ -265,4 +274,13 @@ app.onError((err, c) => {
     return c.html('<!doctype html><meta charset="utf-8"><title>Eroare</title><p>A apărut o eroare.</p>', 500);
 });
 
-export default app;
+// ── Export ───────────────────────────────────────────────────────────────────
+//  Înainte era `export default app;` (Hono, doar fetch). Acum exportăm un
+//  obiect cu ambele: `fetch` (exact comportamentul Hono de dinainte) și
+//  `scheduled` (apelat de Cloudflare la orele din triggers.crons).
+export default {
+    fetch: app.fetch,
+    async scheduled(event, env, ctx) {
+        ctx.waitUntil(sweepOrphanedMedia(env));
+    },
+};

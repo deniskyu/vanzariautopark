@@ -5,9 +5,10 @@
 //    PUBLICE  (/api/cars/*)        — citire, pentru site
 //    ADMIN    (/api/admin/cars/*)  — scriere, protejate de requireAuth
 //
-//  Media NU se atinge aici — upload-ul și ștergerea fișierelor vin în Batch 3.
-//  Rutele de scriere primesc/returnează câmpul `media` ca JSON, dar procesarea
-//  efectivă a fișierelor e separată.
+//  Media NU se atinge aici, cu O EXCEPȚIE: la editare (PUT), facem diff între
+//  media veche (din DB) și media nouă (trimisă din formular) și ștergem din B2
+//  orice poză scoasă — altfel rămânea orfană (Strat 2 din strategia anti-orfani,
+//  vezi și media.js pentru Stratul 1 și src/lib/sweep.js pentru Stratul 3).
 // ============================================================================
 
 import { Hono } from 'hono';
@@ -268,7 +269,8 @@ adminCars.put('/:id', async (c) => {
     const db = c.env.DB;
     const id = c.req.param('id');
 
-    const existing = await db.prepare('SELECT id FROM cars WHERE id = ?').bind(id).first();
+    // Citim și `media` (nu doar `id`), ca să putem face diff mai jos.
+    const existing = await db.prepare('SELECT id, media FROM cars WHERE id = ?').bind(id).first();
     if (!existing) return c.json({ ok: false, error: 'Anunț inexistent.' }, 404);
 
     let body;
@@ -286,6 +288,15 @@ adminCars.put('/:id', async (c) => {
 
     let media = [];
     if (Array.isArray(body.media)) media = body.media.slice(0, LIMITS.max_photos);
+
+    // ── Diff media (Strat 2 anti-orfani) ──────────────────────────────────
+    //  Orice poză care era în `media` veche dar nu mai apare în lista nouă
+    //  a fost scoasă din formular — trebuie ștearsă și din B2, nu doar din
+    //  rândul din DB. Fără asta, pozele înlocuite la editare rămân orfane.
+    let oldMedia = [];
+    try { oldMedia = JSON.parse(existing.media || '[]'); } catch {}
+    const newIds = new Set(media.map((m) => m && m.id).filter(Boolean));
+    const removed = oldMedia.filter((m) => m && m.id && !newIds.has(m.id));
 
     // status: se poate schimba în draft/published/sold din editare
     let statusSql = '', statusBinds = [];
@@ -312,6 +323,17 @@ adminCars.put('/:id', async (c) => {
             v.data.for_dismantling, v.data.description, phone, JSON.stringify(media),
             ...statusBinds, id
         ).run();
+
+        // Ștergem din B2 pozele scoase — în fundal, nu blocăm răspunsul, și nu
+        // eșuăm salvarea mașinii dacă ștergerea din B2 dă vreo eroare.
+        if (removed.length) {
+            c.executionCtx?.waitUntil?.(deleteCarMedia(c.env, id, removed));
+            c.executionCtx?.waitUntil?.(
+                db.prepare(
+                    `DELETE FROM media_uploads WHERE id IN (${removed.map(() => '?').join(',')})`
+                ).bind(...removed.map((m) => m.id)).run().catch(() => {})
+            );
+        }
 
         return c.json({ ok: true, id });
     } catch (err) {
@@ -343,12 +365,12 @@ adminCars.patch('/:id/status', async (c) => {
 });
 
 // ── Ștergere ─────────────────────────────────────────────────────────────────
-//  Aici doar rândul din D1. Ștergerea fotografiilor din B2 se leagă în Batch 3.
+//  Rândul din D1 + fotografiile din B2 (Strat 4 anti-orfani — deja exista).
 adminCars.delete('/:id', async (c) => {
     const db = c.env.DB;
     const id = c.req.param('id');
     try {
-        // Întâi citim media, ca Batch 3 să poată șterge fișierele.
+        // Întâi citim media, ca să putem șterge fișierele.
         const row = await db.prepare('SELECT media FROM cars WHERE id = ?').bind(id).first();
         if (!row) return c.json({ ok: false, error: 'Anunț inexistent.' }, 404);
 

@@ -375,7 +375,10 @@ h3{font-size:clamp(1.15rem,1rem + .6vw,1.45rem)}
   padding:clamp(1rem,.8rem + 1vw,1.5rem);margin-bottom:clamp(1.5rem,1rem + 2vw,2.4rem);
 }
 .filters-grid{display:grid;gap:.9rem;grid-template-columns:1fr}
-@media(min-width:600px){.filters-grid{grid-template-columns:1fr 1fr}}
+@media(min-width:600px){
+  .filters-grid{grid-template-columns:1fr 1fr;grid-auto-flow:dense}
+  .f-field:has(.f-pair){grid-column:span 2}
+}
 @media(min-width:960px){.filters-grid{grid-template-columns:repeat(3,1fr)}}
 .f-field{display:flex;flex-direction:column;gap:.4rem}
 .f-field label{font-size:.8rem;font-weight:700;color:var(--muted);letter-spacing:.02em}
