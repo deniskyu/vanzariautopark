@@ -48,20 +48,29 @@ const timingSafeEqual = (a, b) => {
  */
 export const createSession = async (c, db) => {
     const token = newToken();
-    const expires = new Date(Date.now() + SESSION_MS).toISOString();
-    await db.prepare('INSERT INTO sessions (token, expires_at) VALUES (?, ?)')
-        .bind(token, expires).run();
 
-    const isProd = (c.env.NODE_ENV || 'production') === 'production';
-        setCookie(c, COOKIE_NAME, token, {
+    const expires = new Date(
+        Date.now() + SESSION_MS
+    ).toISOString();
+
+    await db
+        .prepare(
+            'INSERT INTO sessions (token, expires_at) VALUES (?, ?)'
+        )
+        .bind(token, expires)
+        .run();
+
+    setCookie(c, COOKIE_NAME, token, {
         httpOnly: true,
         secure: true,
-        sameSite: 'Lax',
+        sameSite: 'None',
         path: '/',
         maxAge: SESSION_DAYS * 24 * 3600,
     });
+
     return token;
 };
+
 
 /** Verifică sesiunea curentă. Șterge cookie-ul și rândul dacă a expirat. */
 export const readSession = async (c, db) => {
@@ -74,7 +83,7 @@ export const readSession = async (c, db) => {
 
     if (new Date(row.expires_at).getTime() < Date.now()) {
         await db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
-        deleteCookie(c, COOKIE_NAME, { path: '/', domain: '.vanzariautopark.com' });
+        deleteCookie(c, COOKIE_NAME, { path: '/'});
         return null;
     }
     return { token };
@@ -83,7 +92,7 @@ export const readSession = async (c, db) => {
 export const destroySession = async (c, db) => {
     const token = getCookie(c, COOKIE_NAME);
     if (token) await db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
-    deleteCookie(c, COOKIE_NAME, { path: '/', domain: '.vanzariautopark.com' });
+    deleteCookie(c, COOKIE_NAME, { path: '/'});
 };
 
 /** Verifică parola trimisă contra secretului. */
