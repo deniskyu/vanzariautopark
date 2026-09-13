@@ -53,12 +53,11 @@ export const createSession = async (c, db) => {
         .bind(token, expires).run();
 
     const isProd = (c.env.NODE_ENV || 'production') === 'production';
-    setCookie(c, COOKIE_NAME, token, {
+        setCookie(c, COOKIE_NAME, token, {
         httpOnly: true,
-        sameSite: 'Lax',
         secure: true,
+        sameSite: 'Lax',
         path: '/',
-        domain: '.vanzariautopark.com',
         maxAge: SESSION_DAYS * 24 * 3600,
     });
     return token;
