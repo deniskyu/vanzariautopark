@@ -33,11 +33,14 @@
   // ── Cron Triggers ────────────────────────────────────────────────────────
   //  Cloudflare apelează automat export-ul `scheduled` din src/index.js la
   //  orele de mai jos — nu ai nevoie de niciun server sau serviciu separat.
-  //  "0 3 * * *" = minutul 0, ora 3, în fiecare zi, orice lună, orice zi din
-  //  săptămână → 03:00 UTC zilnic (05:00 sau 06:00 ora României, în funcție
-  //  de ora de vară). Rulează sweepOrphanedMedia() din src/lib/sweep.js.
+  //  "0 3 * * *" = 03:00 UTC zilnic (06:00 ora României, vara). Rulează
+  //  sweepOrphanedMedia() din src/lib/sweep.js.
+  //
+  //  "15 11 * * *" = TEMPORAR, DOAR PENTRU TEST — 11:15 UTC = 14:15 ora
+  //  României. Șterge linia asta după ce confirmi că sweep-ul merge, altfel
+  //  rulează în fiecare zi la ora asta pe termen nelimitat.
   "triggers": {
-    "crons": ["0 3 * * *"]
+    "crons": ["0 3 * * *", "32 11 * * *"]
   },
 
   // ── Variabile publice (nu secrete) ──

@@ -19,7 +19,7 @@
 
 import { deleteObject } from './storage.js';
 
-const STALE_HOURS = 24;
+const STALE_HOURS = 0;
 
 export async function sweepOrphanedMedia(env) {
     const db = env.DB;
