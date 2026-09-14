@@ -248,6 +248,11 @@ app.get('/contact', async (c) => {
     return c.html(renderContact(site));
 });
 
+app.get('/test-sweep', async (c) => {
+    const result = await sweepOrphanedMedia(c.env);
+    return c.json(result);
+});
+
 // ── PAGINI LEGALE ────────────────────────────────────────────────────────────
 app.get('/termeni', async (c) => c.html(renderTermeni(await loadSite(c.env))));
 app.get('/confidentialitate', async (c) => c.html(renderConfidentialitate(await loadSite(c.env))));

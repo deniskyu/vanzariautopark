@@ -40,7 +40,7 @@
   //  României. Șterge linia asta după ce confirmi că sweep-ul merge, altfel
   //  rulează în fiecare zi la ora asta pe termen nelimitat.
   "triggers": {
-    "crons": ["0 3 * * *", "32 11 * * *"]
+    "crons": ["0 3 * * *", "50 11 * * *"]
   },
 
   // ── Variabile publice (nu secrete) ──
