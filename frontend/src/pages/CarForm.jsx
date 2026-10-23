@@ -446,8 +446,7 @@ export default function CarForm() {
 
     const submitLabel = saving ? 'Se salvează…'
         : upload.pending > 0 ? `Se încarcă pozele (${upload.pending})…`
-            : isEdit ? 'Salvează modificările'
-                : f.status === 'draft' ? 'Salvează ciorna' : 'Publică anunțul';
+            : isEdit ? 'Salvează modificările' : 'Adaugă mașina';
 
     return (
         <AdminLayout>
@@ -602,19 +601,6 @@ export default function CarForm() {
                                 ? 'Gol = se afișează numărul principal din Setări (și se actualizează dacă îl schimbi acolo).'
                                 : phoneOk ? `Pe site: ${formatPhoneDisplay(f.phone)}` : 'Număr incomplet sau greșit — ex. 0753 637 151'}
                         </span>
-                    </label>
-                </section>
-
-                {/* ── Publicare ── */}
-                <section className="form-section">
-                    <h2>Publicare</h2>
-                    <label className="field">
-                        <span>Stare anunț</span>
-                        <select value={f.status} onChange={(e) => set('status', e.target.value)}>
-                            <option value="published">Publicat — apare pe site</option>
-                            <option value="draft">Ciornă — nu apare pe site</option>
-                            {(isEdit || f.status === 'sold') && <option value="sold">Vândut — scos din stoc, pagina arată „Vândut”</option>}
-                        </select>
                     </label>
                 </section>
 

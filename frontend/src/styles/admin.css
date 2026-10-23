@@ -240,15 +240,3 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);
   border:1px solid var(--border-strong);border-radius:var(--radius-sm)}
 .relogin-row input:focus{outline:none;border-color:var(--accent)}
 .relogin-row .btn{flex:1 1 auto}
-.modal .modal-hint{color:var(--text);font-size:.9rem;background:var(--surface-2);
-  border-radius:var(--radius-sm);padding:.7rem .8rem;margin-top:-.6rem}
-
-/* ── Lista de mașini: filtru pe stare + acțiuni rapide ─────────────────── */
-.list-filter{display:flex;gap:.3rem;flex-wrap:wrap}
-.list-filter button{min-height:44px;padding:0 .9rem;border-radius:999px;
-  border:1px solid var(--border-strong);color:var(--muted);font-weight:700;font-size:.85rem;
-  transition:border-color var(--t),color var(--t)}
-.list-filter button:hover{border-color:var(--accent);color:var(--accent)}
-.list-filter button.is-active{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.acar-quick{display:flex;flex-wrap:wrap;gap:.5rem}
-.acar-quick .btn{flex:1 1 auto}

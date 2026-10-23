@@ -40,17 +40,16 @@ export function Loading({ text = 'Se încarcă…' }) {
 }
 
 // ── Modal de confirmare (pentru ștergere) ────────────────────────────────────
-export function ConfirmModal({ title, message, carName, confirmLabel = 'Șterge', busyLabel = 'Se șterge…', hint, onConfirm, onCancel, busy }) {
+export function ConfirmModal({ title, message, carName, confirmLabel = 'Șterge', onConfirm, onCancel, busy }) {
     return (
         <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
             <div className="modal" role="dialog" aria-modal="true">
                 <h3>{title}</h3>
                 <p>{message} {carName && <span className="modal-car">{carName}</span>}</p>
-                {hint && <p className="modal-hint">{hint}</p>}
                 <div className="modal-actions">
                     <button className="btn btn--ghost" onClick={onCancel} disabled={busy}>Anulează</button>
                     <button className="btn btn--danger" onClick={onConfirm} disabled={busy}>
-                        {busy ? busyLabel : confirmLabel}
+                        {busy ? 'Se șterge…' : confirmLabel}
                     </button>
                 </div>
             </div>

@@ -1,9 +1,9 @@
 // ============================================================================
 //  src/pages/CarList.jsx — lista de mașini din panou
 // ----------------------------------------------------------------------------
-//  Toate mașinile (publicate, ciorne, vândute), cu căutare, filtru pe stare,
-//  paginare, marcare rapidă ca vândută / republicare și ștergere cu confirmare.
-//  Butonul de adăugare duce la formular.
+//  Toate mașinile (draft, published, sold), cu căutare, filtru pe status,
+//  paginare și ștergere cu confirmare. Butonul de adăugare duce la formular
+//  (Batch 10).
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react';
@@ -11,16 +11,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { AdminLayout, Loading, ConfirmModal, Toast, Pager } from '../components/ui.jsx';
 
-const SITE = import.meta.env.VITE_API_URL || '';
 const fmt = (n) => new Intl.NumberFormat('de-DE').format(n);
-
-const STATUS_LABEL = { published: 'Publicat', draft: 'Ciornă', sold: 'Vândut' };
-const FILTERS = [
-    { value: '', label: 'Toate' },
-    { value: 'published', label: 'Publicate' },
-    { value: 'draft', label: 'Ciorne' },
-    { value: 'sold', label: 'Vândute' },
-];
 
 export default function CarList() {
     const [cars, setCars] = useState([]);
@@ -29,10 +20,8 @@ export default function CarList() {
     const [pages, setPages] = useState(1);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
-    const [status, setStatus] = useState('');
     const [toDelete, setToDelete] = useState(null);   // mașina de șters
     const [deleting, setDeleting] = useState(false);
-    const [busyId, setBusyId] = useState(null);       // mașina căreia îi schimbăm starea
     const [toast, setToast] = useState(null);
 
     const flash = (type, message) => {
@@ -44,7 +33,7 @@ export default function CarList() {
         setLoading(true);
         try {
             const p = opts.page ?? page;
-            const r = await api.listCars({ page: p, search, status });
+            const r = await api.listCars({ page: p, search });
             setCars(r.cars || []);
             setTotal(r.total || 0);
             setPages(r.pages || 1);
@@ -54,14 +43,14 @@ export default function CarList() {
         } finally {
             setLoading(false);
         }
-    }, [page, search, status]);
+    }, [page, search]);
 
     // Încărcare inițială + la schimbarea filtrelor (cu debounce pe căutare).
     useEffect(() => {
         const timer = setTimeout(() => load({ page: 1 }), search ? 350 : 0);
         return () => clearTimeout(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [search, status]);
+    }, [search]);
 
     const confirmDelete = async () => {
         if (!toDelete) return;
@@ -80,21 +69,6 @@ export default function CarList() {
         }
     };
 
-    const changeStatus = async (car, next) => {
-        if (busyId) return;
-        setBusyId(car.id);
-        try {
-            await api.setCarStatus(car.id, next);
-            flash('ok', next === 'sold' ? 'Marcată ca vândută — scoasă din stoc.'
-                : next === 'published' ? 'Anunțul e din nou pe site.' : 'Mutată la ciorne.');
-            load();
-        } catch (err) {
-            flash('err', err.message);
-        } finally {
-            setBusyId(null);
-        }
-    };
-
     return (
         <AdminLayout>
             <div className="page-head">
@@ -107,39 +81,29 @@ export default function CarList() {
                     <input type="search" placeholder="Caută după titlu sau marcă…"
                            value={search} onChange={(e) => setSearch(e.target.value)} />
                 </div>
-                <div className="list-filter" role="group" aria-label="Filtru după stare">
-                    {FILTERS.map((o) => (
-                        <button key={o.value} type="button"
-                                className={status === o.value ? 'is-active' : ''}
-                                aria-pressed={status === o.value}
-                                onClick={() => setStatus(o.value)}>{o.label}</button>
-                    ))}
-                </div>
+
             </div>
 
             {loading ? (
                 <Loading />
             ) : cars.length === 0 ? (
                 <div className="empty">
-                    <h2>{search || status ? 'Nicio mașină găsită' : 'Nicio mașină încă'}</h2>
-                    <p>{search || status ? 'Încearcă alt termen sau alt filtru.' : 'Adaugă prima mașină din butonul de sus.'}</p>
+                    <h2>{search ? 'Nicio mașină găsită' : 'Nicio mașină încă'}</h2>
+                    <p>{search ? 'Încearcă alt termen.' : 'Adaugă prima mașină din butonul de sus.'}</p>
                 </div>
             ) : (
                 <>
                     <div className="car-list">
                         {cars.map((car) => {
                             const cover = car.media?.[0]
-                                ? `${SITE}/media/cars/${car.media[0].dir || car.id}/${car.media[0].id}.${car.media[0].ext || 'jpg'}`
+                                ? `${import.meta.env.VITE_API_URL || ''}/media/cars/${car.media[0].dir || car.id}/${car.media[0].id}.${car.media[0].ext || 'jpg'}`
                                 : null;
-                            const st = car.status || 'published';
-                            const busy = busyId === car.id;
                             return (
                                 <article className="acar" key={car.id}>
                                     <div className="acar-media">
                                         {cover
                                             ? <img src={cover} alt={car.title} loading="lazy" />
                                             : <div className="acar-noimg">Fără poze</div>}
-                                        <span className={`acar-status ${st}`}>{STATUS_LABEL[st] || st}</span>
                                         <span className="acar-views" title="Vizualizări">👁 {car.views ?? 0}</span>
                                     </div>
                                     <div className="acar-body">
@@ -150,20 +114,6 @@ export default function CarList() {
                                             <span>{car.fuel}</span>
                                         </div>
                                         <div className="acar-price">{fmt(car.price)} €</div>
-                                        <div className="acar-quick">
-                                            {st === 'published' && (
-                                                <button type="button" className="btn btn--ghost btn--sm" disabled={busy}
-                                                        onClick={() => changeStatus(car, 'sold')}>Vândută</button>
-                                            )}
-                                            {st !== 'published' && (
-                                                <button type="button" className="btn btn--ghost btn--sm" disabled={busy}
-                                                        onClick={() => changeStatus(car, 'published')}>Publică din nou</button>
-                                            )}
-                                            {st !== 'draft' && SITE && (
-                                                <a className="btn btn--ghost btn--sm" href={`${SITE}/masina/${car.slug}`}
-                                                   target="_blank" rel="noopener noreferrer">Vezi pe site</a>
-                                            )}
-                                        </div>
                                         <div className="acar-actions">
                                             <Link className="btn btn--ghost btn--sm" to={`/masina/${car.id}`}>Editează</Link>
                                             <button className="icon-btn" title="Șterge"
@@ -183,9 +133,6 @@ export default function CarList() {
                     title="Ștergi această mașină?"
                     message="Acțiunea e definitivă. Se șterg și toate fotografiile:"
                     carName={toDelete.title}
-                    hint={toDelete.status === 'published'
-                        ? 'Dacă mașina s-a vândut, folosește mai bine „Vândută": anunțul iese din stoc, dar linkul și pozele rămân.'
-                        : null}
                     onConfirm={confirmDelete}
                     onCancel={() => setToDelete(null)}
                     busy={deleting}
