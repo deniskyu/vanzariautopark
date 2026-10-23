@@ -19,8 +19,9 @@
 import { Hono } from 'hono';
 import { requireAuth } from '../auth.js';
 import { validateCar, generateCarSlug, normalizePhone } from '../lib/carUtils.js';
-import { deleteCarMedia } from '../lib/storage.js';
-import { resolveMedia, missingMediaResponse, ledgerDetachStmt } from '../lib/mediaCheck.js';
+import {
+    resolveMedia, missingMediaResponse, ledgerDetachStmt, releaseCarMedia,
+} from '../lib/mediaCheck.js';
 import {
     BRANDS, FUEL_TYPES, POLLUTION_STANDARDS, ENGINE_CAPACITIES, LIMITS,
 } from '../data/carOptions.js';
@@ -205,10 +206,11 @@ adminCars.get('/', async (c) => {
 });
 
 // ── Citire pentru editare (orice status) ─────────────────────────────────────
+//  `updated_at` merge înapoi la PUT: așa prindem două taburi pe aceeași mașină.
 adminCars.get('/:id', async (c) => {
     const db = c.env.DB;
     try {
-        const row = await db.prepare(`SELECT ${CAR_COLUMNS}, sold_at, position FROM cars WHERE id = ?`)
+        const row = await db.prepare(`SELECT ${CAR_COLUMNS}, sold_at, position, updated_at FROM cars WHERE id = ?`)
             .bind(c.req.param('id')).first();
         if (!row) return c.json({ ok: false, error: 'Anunț inexistent.' }, 404);
         return c.json({ ok: true, car: hydrate(row) });
@@ -217,10 +219,16 @@ adminCars.get('/:id', async (c) => {
     }
 });
 
+// Marcaj de timp cu milisecunde — două salvări în aceeași secundă rămân diferite.
+const NOW_MS = "strftime('%Y-%m-%d %H:%M:%f','now')";
+
 // ── Verificarea pozelor, comună pentru POST și PUT ──────────────────────────
 //  Întoarce { media, attachIds } sau { response } dacă salvarea trebuie oprită.
 const checkMedia = async (c, rawMedia, oldMedia = []) => {
-    const list = Array.isArray(rawMedia) ? rawMedia.slice(0, LIMITS.max_photos) : [];
+    const list = Array.isArray(rawMedia) ? rawMedia : [];
+    if (list.length > LIMITS.max_photos) {
+        return { response: c.json({ ok: false, errors: [`Maxim ${LIMITS.max_photos} de poze pe anunț.`] }, 400) };
+    }
     let r;
     try {
         r = await resolveMedia(c.env, list, oldMedia);
@@ -236,6 +244,26 @@ const checkMedia = async (c, rawMedia, oldMedia = []) => {
     return { media: r.media, attachIds: r.attachIds };
 };
 
+// ── Telefonul anunțului ──────────────────────────────────────────────────────
+//  Gol sau identic cu numărul principal al parcului → salvăm '' și pagina
+//  afișează numărul curent din Setări. Înainte se copia numărul în anunț, iar
+//  după o schimbare în Setări anunțurile vechi rămâneau cu numărul vechi.
+const resolvePhone = async (db, phone) => {
+    if (!phone) return '';
+    try {
+        const s = await db.prepare('SELECT phone_primary FROM settings WHERE id = 1').first();
+        if (normalizePhone(s?.phone_primary) === phone) return '';
+    } catch { /* fără setări — păstrăm numărul dat */ }
+    return phone;
+};
+
+const conflictResponse = (c) => c.json({
+    ok: false,
+    conflict: true,
+    error: 'Anunțul a fost modificat între timp (în alt tab sau de pe alt dispozitiv). ' +
+        'Reîncarcă pagina ca să vezi ultima versiune, apoi refă modificarea.',
+}, 409);
+
 // ── Adăugare ─────────────────────────────────────────────────────────────────
 //  Media vine ca array de poze deja urcate (vezi media.js). Validăm câmpurile,
 //  verificăm că pozele încă există, apoi scriem rândul.
@@ -248,12 +276,32 @@ adminCars.post('/', async (c) => {
     const v = validateCar(body);
     if (!v.ok) return c.json({ ok: false, errors: v.errors }, 400);
 
-    // Telefon gol → numărul principal al parcului (din settings).
-    let phone = v.data.phone;
-    if (!phone) {
-        const s = await db.prepare('SELECT phone_primary FROM settings WHERE id = 1').first();
-        phone = normalizePhone(s?.phone_primary) || '';
+    // ── Anunț deja salvat? (dublu-click, sau retry după ce răspunsul s-a pierdut)
+    //  Pozele au id-uri unice: dacă o mașină le folosește deja, e aceeași
+    //  salvare repetată — întoarcem mașina existentă, nu facem una nouă (o
+    //  dublură împărțea fișierele, iar ștergerea ei strica originalul).
+    const rawList = Array.isArray(body.media) ? body.media : [];
+    const rawIds = rawList
+        .map((m) => m && m.id).filter((x) => typeof x === 'string' && /^[a-f0-9]{24}$/.test(x));
+    try {
+        let dup = null;
+        if (rawIds.length) {
+            dup = await db.prepare('SELECT id, slug FROM cars WHERE media LIKE ? LIMIT 1')
+                .bind(`%"id":"${rawIds[0]}"%`).first();
+        } else if (rawList.length === 0) {
+            // fără poze: aceeași mașină, tot fără poze, trimisă de două ori în
+            // ultimele 2 minute
+            dup = await db.prepare(
+                `SELECT id, slug FROM cars WHERE title = ? AND brand = ? AND price = ? AND mileage = ?
+                   AND media = '[]' AND created_at > datetime('now', '-2 minutes') LIMIT 1`
+            ).bind(v.data.title, v.data.brand, v.data.price, v.data.mileage).first();
+        }
+        if (dup) return c.json({ ok: true, id: dup.id, slug: dup.slug, already: true });
+    } catch (err) {
+        console.warn('[adminCars] dedupe:', err.message);
     }
+
+    const phone = await resolvePhone(db, v.data.phone);
 
     // Media: doar poze care chiar există în B2 (vezi lib/mediaCheck.js).
     const mc = await checkMedia(c, body.media);
@@ -293,28 +341,30 @@ adminCars.post('/', async (c) => {
 });
 
 // ── Editare ──────────────────────────────────────────────────────────────────
-//  Marca, anul NU se schimbă (slug-ul e derivat din ele și e deja indexat).
-//  Restul câmpurilor, da.
+//  Se poate schimba orice câmp, inclusiv marca și anul. Slug-ul (URL-ul) rămâne
+//  același, ca linkurile deja trimise să meargă în continuare.
 adminCars.put('/:id', async (c) => {
     const db = c.env.DB;
     const id = c.req.param('id');
 
-    // Citim și `media` (nu doar `id`), ca să putem face diff mai jos.
-    const existing = await db.prepare('SELECT id, media FROM cars WHERE id = ?').bind(id).first();
+    const existing = await db.prepare('SELECT id, media, status, updated_at FROM cars WHERE id = ?').bind(id).first();
     if (!existing) return c.json({ ok: false, error: 'Anunț inexistent.' }, 404);
 
     let body;
     try { body = await c.req.json(); }
     catch { return c.json({ ok: false, error: 'Corp invalid.' }, 400); }
 
+    // Formularul trimite versiunea pe care a încărcat-o. Dacă între timp mașina
+    // s-a salvat din alt tab/dispozitiv, nu suprascriem — altfel modificările
+    // de acolo se pierdeau și pozele adăugate acolo erau șterse din B2.
+    if (typeof body.updated_at === 'string' && body.updated_at && body.updated_at !== existing.updated_at) {
+        return conflictResponse(c);
+    }
+
     const v = validateCar(body);
     if (!v.ok) return c.json({ ok: false, errors: v.errors }, 400);
 
-    let phone = v.data.phone;
-    if (!phone) {
-        const s = await db.prepare('SELECT phone_primary FROM settings WHERE id = 1').first();
-        phone = normalizePhone(s?.phone_primary) || '';
-    }
+    const phone = await resolvePhone(db, v.data.phone);
 
     let oldMedia = [];
     try { oldMedia = JSON.parse(existing.media || '[]'); } catch {}
@@ -326,60 +376,57 @@ adminCars.put('/:id', async (c) => {
 
     // ── Diff media (Strat 2 anti-orfani) ──────────────────────────────────
     //  Orice poză care era în `media` veche dar nu mai apare în lista nouă
-    //  a fost scoasă din formular — trebuie ștearsă și din B2, nu doar din
-    //  rândul din DB. Fără asta, pozele înlocuite la editare rămân orfane.
+    //  a fost scoasă din formular — se șterge din B2 DOAR după ce salvarea a
+    //  reușit (formularul nu mai șterge nimic singur, vezi PhotoUploader).
     const newIds = new Set(media.map((m) => m && m.id).filter(Boolean));
     const removed = oldMedia.filter((m) => m && m.id && !newIds.has(m.id));
 
-    // status: se poate schimba în draft/published/sold din editare
-    let statusSql = '', statusBinds = [];
-    if (['draft', 'published', 'sold'].includes(body.status)) {
-        statusSql = ', status = ?';
-        statusBinds.push(body.status);
-        if (body.status === 'sold') statusSql += ", sold_at = datetime('now')";
-    }
+    // status + sold_at: data vânzării se pune doar la trecerea în „vândut”,
+    // nu la fiecare salvare a unei mașini deja vândute.
+    const status = ['draft', 'published', 'sold'].includes(body.status) ? body.status : existing.status;
 
     try {
-        const update = db.prepare(`
+        const r = await db.prepare(`
             UPDATE cars SET
-                title=?, price=?, negotiable=?, mileage=?, fuel=?, engine_capacity=?,
-                horsepower=?, pollution_standard=?, body_type=?, color=?, transmission=?,
-                drivetrain=?, steering_wheel=?, vin=?, registration_status=?,
-                for_dismantling=?, description=?, phone=?, media=?,
-                updated_at=datetime('now') ${statusSql}
-            WHERE id=?
+                title=?, brand=?, production_year=?, price=?, negotiable=?, mileage=?,
+                fuel=?, engine_capacity=?, horsepower=?, pollution_standard=?, body_type=?,
+                color=?, transmission=?, drivetrain=?, steering_wheel=?, vin=?,
+                registration_status=?, for_dismantling=?, description=?, phone=?, media=?,
+                status=?,
+                sold_at = CASE WHEN ? = 'sold'
+                               THEN (CASE WHEN status = 'sold' THEN sold_at ELSE datetime('now') END)
+                               ELSE NULL END,
+                updated_at=${NOW_MS}
+            WHERE id=? AND updated_at=?
         `).bind(
-            v.data.title, v.data.price, v.data.negotiable, v.data.mileage, v.data.fuel,
-            v.data.engine_capacity, v.data.horsepower, v.data.pollution_standard,
-            v.data.body_type, v.data.color, v.data.transmission, v.data.drivetrain,
-            v.data.steering_wheel, v.data.vin, v.data.registration_status,
+            v.data.title, v.data.brand, v.data.production_year, v.data.price, v.data.negotiable,
+            v.data.mileage, v.data.fuel, v.data.engine_capacity, v.data.horsepower,
+            v.data.pollution_standard, v.data.body_type, v.data.color, v.data.transmission,
+            v.data.drivetrain, v.data.steering_wheel, v.data.vin, v.data.registration_status,
             v.data.for_dismantling, v.data.description, phone, JSON.stringify(media),
-            ...statusBinds, id
-        );
+            status, status,
+            id, existing.updated_at
+        ).run();
 
-        // Actualizarea + scoaterea pozelor noi din ledger, atomic.
+        // 0 rânduri = altă salvare a ajuns între citire și scriere.
+        if (!r.meta?.changes) return conflictResponse(c);
+
+        // Pozele noi sunt acum atașate — le scoatem din ledger.
         const detach = ledgerDetachStmt(db, attachIds);
-        await db.batch(detach ? [update, detach] : [update]);
+        if (detach) await detach.run().catch((err) => console.warn('[adminCars] ledger detach:', err.message));
 
-        // Ștergem din B2 pozele scoase — în fundal, nu blocăm răspunsul, și nu
-        // eșuăm salvarea mașinii dacă ștergerea din B2 dă vreo eroare.
-        if (removed.length) {
-            c.executionCtx?.waitUntil?.(deleteCarMedia(c.env, id, removed));
-            c.executionCtx?.waitUntil?.(
-                db.prepare(
-                    `DELETE FROM media_uploads WHERE id IN (${removed.map(() => '?').join(',')})`
-                ).bind(...removed.map((m) => m.id)).run().catch(() => {})
-            );
-        }
+        // Ștergem din B2 pozele scoase — în fundal, fără să blocăm răspunsul.
+        if (removed.length) c.executionCtx?.waitUntil?.(releaseCarMedia(c.env, id, removed));
 
-        return c.json({ ok: true, id });
+        const fresh = await db.prepare('SELECT updated_at FROM cars WHERE id = ?').bind(id).first();
+        return c.json({ ok: true, id, updated_at: fresh?.updated_at || null });
     } catch (err) {
         console.error('[adminCars] update:', err.message);
         return c.json({ ok: false, error: 'Eroare la salvare.' }, 500);
     }
 });
 
-// ── Marcare rapidă ca vândut / disponibil ────────────────────────────────────
+// ── Marcare rapidă: publicat / ciornă / vândut ───────────────────────────────
 adminCars.patch('/:id/status', async (c) => {
     const db = c.env.DB;
     const id = c.req.param('id');
@@ -389,11 +436,16 @@ adminCars.patch('/:id/status', async (c) => {
     if (!['draft', 'published', 'sold'].includes(body.status))
         return c.json({ ok: false, error: 'Stare invalidă.' }, 400);
 
-    const soldSql = body.status === 'sold' ? ", sold_at = datetime('now')" : '';
     try {
         const r = await db.prepare(
-            `UPDATE cars SET status = ?${soldSql}, updated_at = datetime('now') WHERE id = ?`
-        ).bind(body.status, id).run();
+            `UPDATE cars SET
+                sold_at = CASE WHEN ? = 'sold'
+                               THEN (CASE WHEN status = 'sold' THEN sold_at ELSE datetime('now') END)
+                               ELSE NULL END,
+                status = ?,
+                updated_at = ${NOW_MS}
+             WHERE id = ?`
+        ).bind(body.status, body.status, id).run();
         if (!r.meta.changes) return c.json({ ok: false, error: 'Anunț inexistent.' }, 404);
         return c.json({ ok: true });
     } catch (err) {
@@ -402,22 +454,20 @@ adminCars.patch('/:id/status', async (c) => {
 });
 
 // ── Ștergere ─────────────────────────────────────────────────────────────────
-//  Rândul din D1 + fotografiile din B2 (Strat 4 anti-orfani — deja exista).
+//  Rândul din D1 + fotografiile din B2 (doar cele pe care nu le mai folosește
+//  altă mașină; ștergerile eșuate sunt reîncercate de sweep).
 adminCars.delete('/:id', async (c) => {
     const db = c.env.DB;
     const id = c.req.param('id');
     try {
-        // Întâi citim media, ca să putem șterge fișierele.
         const row = await db.prepare('SELECT media FROM cars WHERE id = ?').bind(id).first();
         if (!row) return c.json({ ok: false, error: 'Anunț inexistent.' }, 404);
 
         await db.prepare('DELETE FROM cars WHERE id = ?').bind(id).run();
 
-        // Ștergem și fotografiile din B2. Best-effort, în fundal — nu blocăm
-        // răspunsul și nu eșuăm ștergerea anunțului dacă B2 dă o eroare.
         let mediaList = [];
         try { mediaList = JSON.parse(row.media || '[]'); } catch {}
-        c.executionCtx?.waitUntil?.(deleteCarMedia(c.env, id, mediaList));
+        if (mediaList.length) c.executionCtx?.waitUntil?.(releaseCarMedia(c.env, id, mediaList));
 
         return c.json({ ok: true });
     } catch (err) {

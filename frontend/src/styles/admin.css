@@ -162,7 +162,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);
 .form-row{display:grid;gap:1rem;grid-template-columns:1fr}
 @media(min-width:560px){.form-row{grid-template-columns:1fr 1fr}}
 .field .ch{float:right;color:var(--muted-2);font-style:normal;font-size:.78rem;font-weight:400}
-.field-hint{color:var(--muted);font-size:.85rem;margin-top:.5rem}
+.field-hint{display:block;color:var(--muted);font-size:.85rem;margin-top:.5rem}
+.field-hint.is-bad{color:var(--danger)}
 .check{display:flex;align-items:center;gap:.6rem;margin-top:.9rem;cursor:pointer;font-size:.95rem}
 .check input{width:20px;height:20px;accent-color:var(--accent)}
 .status-pills{display:flex;gap:.6rem}
@@ -184,7 +185,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);
 .photo{background:var(--surface-2);border:1px solid var(--border-strong)}
 .photo img{width:100%;height:100%;object-fit:cover}
 .photo.is-error{border-color:var(--danger)}
-.photo-cover{position:absolute;bottom:0;left:0;right:0;padding:.2rem;text-align:center;
+.photo-cover{position:absolute;bottom:0;left:0;padding:.25rem .5rem;
+  border-top-right-radius:var(--radius-sm);
   background:var(--accent);color:var(--on-accent);font-size:.68rem;font-weight:800;text-transform:uppercase}
 .photo-del{position:absolute;top:.3rem;right:.3rem;width:26px;height:26px;border-radius:50%;
   background:rgba(0,0,0,.75);color:#fff;font-size:.85rem;display:flex;align-items:center;justify-content:center}
@@ -194,8 +196,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);
 .photo-bar{width:80%;height:5px;background:var(--border-strong);border-radius:3px;overflow:hidden}
 .photo-bar span{display:block;height:100%;background:var(--accent);transition:width .2s}
 .photo-pct{font-size:.75rem;font-weight:700;color:var(--muted)}
-.photo-err{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
-  color:var(--danger);font-size:.8rem;font-weight:700}
+.photo-err{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:.2rem;padding:.4rem;text-align:center;color:var(--danger);font-size:.8rem;font-weight:700}
+.photo-err--over{position:absolute;inset:0;background:rgba(10,10,10,.78)}
+.photo-err-msg{font-size:.66rem;font-weight:500;color:var(--muted);line-height:1.25;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .photo-add{border:2px dashed var(--border-strong);background:var(--surface);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3rem;
   color:var(--muted);font-size:.8rem;transition:border-color var(--t),color var(--t)}
@@ -206,3 +211,44 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);
 .svc-edit{background:var(--surface-2);border:1px solid var(--border-strong);
   border-radius:var(--radius-sm);padding:1rem;margin-bottom:.9rem}
 .svc-edit:last-child{margin-bottom:0}
+
+/* ── Uploader: coadă, reîncercare, reordonare (merge și pe telefon) ─────── */
+.uploader-busy{color:var(--accent);font-size:.85rem;font-weight:700}
+.uploader-failed{color:var(--danger);font-size:.85rem;font-weight:700}
+.photo-retry,.photo-tool{position:absolute;width:28px;height:28px;border-radius:50%;
+  background:rgba(0,0,0,.75);color:#fff;font-size:1rem;line-height:1;font-weight:700;
+  display:flex;align-items:center;justify-content:center;transition:background var(--t),color var(--t)}
+.photo-retry{bottom:.3rem;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--on-accent)}
+.photo-tool--star{top:.3rem;left:.3rem;font-size:.85rem}
+.photo-tool--left{bottom:.3rem;left:.3rem;font-size:1.2rem}
+.photo-tool--right{bottom:.3rem;right:.3rem;font-size:1.2rem}
+.photo-tool:hover,.photo-tool:focus-visible{background:var(--accent);color:var(--on-accent)}
+.photo-del:focus-visible,.photo-tool:focus-visible,.photo-retry:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+/* ── Formular: ecrane speciale ─────────────────────────────────────────── */
+.form-actions--static{position:static;background:none;justify-content:flex-start}
+.draft-offer,.relogin{background:var(--surface);border:1px solid var(--accent);
+  border-radius:var(--radius);padding:1.3rem;margin-bottom:1.2rem;max-width:760px}
+.draft-offer h2{font-size:1.1rem;margin-bottom:.6rem}
+.draft-offer p{color:var(--muted);margin-bottom:.4rem}
+.draft-offer p strong{color:var(--text)}
+.draft-offer-actions{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1rem}
+.draft-offer-actions .btn{flex:1 1 200px}
+.relogin p{color:var(--muted);margin:.3rem 0 .8rem}
+.relogin-row{display:flex;flex-wrap:wrap;gap:.6rem}
+.relogin-row input{flex:1 1 200px;padding:.8rem;min-height:46px;background:var(--surface-2);
+  border:1px solid var(--border-strong);border-radius:var(--radius-sm)}
+.relogin-row input:focus{outline:none;border-color:var(--accent)}
+.relogin-row .btn{flex:1 1 auto}
+.modal .modal-hint{color:var(--text);font-size:.9rem;background:var(--surface-2);
+  border-radius:var(--radius-sm);padding:.7rem .8rem;margin-top:-.6rem}
+
+/* ── Lista de mașini: filtru pe stare + acțiuni rapide ─────────────────── */
+.list-filter{display:flex;gap:.3rem;flex-wrap:wrap}
+.list-filter button{min-height:44px;padding:0 .9rem;border-radius:999px;
+  border:1px solid var(--border-strong);color:var(--muted);font-weight:700;font-size:.85rem;
+  transition:border-color var(--t),color var(--t)}
+.list-filter button:hover{border-color:var(--accent);color:var(--accent)}
+.list-filter button.is-active{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.acar-quick{display:flex;flex-wrap:wrap;gap:.5rem}
+.acar-quick .btn{flex:1 1 auto}

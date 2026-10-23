@@ -26,12 +26,20 @@ async function loadBitmap(file) {
         }
     }
     return await new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
         const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error('Imagine invalidă'));
-        img.src = URL.createObjectURL(file);
+        img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(decodeError(file))); };
+        img.src = url;
     });
 }
+
+const isHeic = (file) => /heic|heif/i.test(file.type || '') || /\.(heic|heif)$/i.test(file.name || '');
+
+// Mesaj pe înțeles când browserul nu poate citi poza.
+const decodeError = (file) => (isHeic(file)
+    ? 'Poza e în format HEIC (iPhone), pe care acest browser nu-l poate citi. Deschide panoul din Safari sau exportă poza ca JPEG.'
+    : 'Poza nu a putut fi citită. Încearcă altă poză sau salveaz-o ca JPEG.');
 
 /**
  * Comprimă un fișier imagine.
@@ -56,6 +64,9 @@ export async function compressImage(file) {
     canvas.width = tw;
     canvas.height = th;
     const ctx = canvas.getContext('2d');
+    // Fundal alb: JPEG nu are transparență, iar un PNG transparent ieșea negru.
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, tw, th);
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(bitmap, 0, 0, tw, th);
     if (bitmap.close) bitmap.close();
@@ -68,9 +79,15 @@ export async function compressImage(file) {
     return { blob, width: tw, height: th };
 }
 
-/** Verifică dacă un fișier e imagine acceptată, înainte de compresie. */
+/** Verifică dacă un fișier e imagine acceptată, înainte de compresie.
+ *  HEIC/HEIF (iPhone) e lăsat să treacă: Safari îl poate citi și îl convertim
+ *  în JPEG; dacă browserul nu poate, compresia dă un mesaj clar. Unele telefoane
+ *  Android dau fișiere fără tip — ne uităm atunci la extensie. */
 export function isAcceptedImage(file) {
-    return /^image\/(jpe?g|png|webp)$/i.test(file.type);
+    const type = (file.type || '').toLowerCase();
+    if (/^image\/(jpe?g|png|webp|heic|heif)$/.test(type)) return true;
+    if (!type) return /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name || '');
+    return false;
 }
 
 /** Format lizibil pentru mărimea unui fișier. */

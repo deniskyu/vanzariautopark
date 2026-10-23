@@ -49,7 +49,11 @@ const loadSite = async (env) => {
     // parsăm JSON-urile
     try { row.services = JSON.parse(row.services || '[]'); } catch { row.services = []; }
     if (!row.schedule) row.schedule = DEFAULT_SCHEDULE;
-    row.domain = row.domain || 'vanzariautopark.ro';
+    // Domeniul public al site-ului (canonical, og:image, JSON-LD). Vine din
+    // SITE_DOMAIN (wrangler.jsonc). Înainte cădea mereu pe .ro, deși site-ul
+    // rulează pe .com — Google și previzualizările de pe WhatsApp/Facebook
+    // primeau linkuri către alt domeniu.
+    row.domain = env.SITE_DOMAIN || row.domain || 'vanzariautopark.com';
     return row;
 };
 
@@ -91,7 +95,7 @@ app.get(`/assets/site.${CSS_VERSION}.css`, (c) => {
 
 // ── SITEMAP & ROBOTS ─────────────────────────────────────────────────────────
 const siteOrigin = (c) => {
-    const host = c.req.header('host') || 'vanzariautopark.ro';
+    const host = c.env.SITE_DOMAIN || c.req.header('host') || 'vanzariautopark.com';
     return `https://${host}`;
 };
 
@@ -154,6 +158,12 @@ app.get('/stoc', async (c) => {
     };
     if (qs.sort && SORTS[qs.sort]) q.sort = qs.sort;
 
+    // Interval inversat (ex. preț de la 20.000 până la 5.000) → îl întoarcem,
+    // în loc să afișăm „Nicio mașină".
+    for (const [lo, hi] of [['an_min', 'an_max'], ['pret_min', 'pret_max'], ['km_min', 'km_max']]) {
+        if (q[lo] != null && q[hi] != null && q[lo] > q[hi]) [q[lo], q[hi]] = [q[hi], q[lo]];
+    }
+
     // Construim WHERE dinamic, totul prin bind.
     const where = ["status = 'published'"];
     const binds = [];
@@ -168,18 +178,18 @@ app.get('/stoc', async (c) => {
     rng('production_year', 'an_min', 'an_max');
     rng('mileage', 'km_min', 'km_max');
 
-    // Interval inversat (min > max) → îl schimbăm între ele, nu întoarcem zero.
-    // (Făcut aici pe query, înainte de bind — dar mai simplu: verificăm în q.)
     const whereSql = where.join(' AND ');
     const order = SORTS[q.sort] || SORTS.nou;
-    const page = Math.max(1, parseInt(qs.page, 10) || 1);
-    const offset = (page - 1) * PAGE_SIZE;
+    let page = Math.max(1, parseInt(qs.page, 10) || 1);
 
     let cars = [], total = 0;
     try {
         const cnt = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM cars WHERE ${whereSql}`)
             .bind(...binds).first();
         total = cnt?.n || 0;
+        // Pagină peste ultima (link vechi, stoc micșorat) → arătăm ultima pagină.
+        page = Math.min(page, Math.max(1, Math.ceil(total / PAGE_SIZE)));
+        const offset = (page - 1) * PAGE_SIZE;
         const { results } = await c.env.DB.prepare(
             `SELECT id, slug, title, brand, production_year, price, mileage, fuel,
                     engine_capacity, media, status FROM cars

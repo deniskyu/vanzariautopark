@@ -18,7 +18,7 @@
 //  Datele unei poze noi (folder, extensie) se iau din ledger, nu din client.
 // ============================================================================
 
-import { headObject } from './storage.js';
+import { headObject, deleteObject } from './storage.js';
 
 const ID_RE = /^[a-f0-9]{24}$/;
 const DIR_RE = /^[a-zA-Z0-9_-]+$/;
@@ -118,4 +118,50 @@ export const ledgerDetachStmt = (db, ids) => (ids && ids.length
     ? db.prepare(`DELETE FROM media_uploads WHERE id IN (${ids.map(() => '?').join(',')})`).bind(...ids)
     : null);
 
-export default { resolveMedia, missingMediaResponse, ledgerDetachStmt };
+/** Folosește vreo mașină (alta decât `exceptCarId`) poza cu acest id? */
+export const isMediaAttached = async (db, mediaId, exceptCarId = '') => {
+    if (!ID_RE.test(mediaId || '')) return false;
+    const row = await db.prepare(
+        'SELECT 1 FROM cars WHERE id != ? AND media LIKE ? LIMIT 1'
+    ).bind(exceptCarId, `%"id":"${mediaId}"%`).first();
+    return !!row;
+};
+
+/**
+ * Șterge din B2 pozele scoase de pe o mașină (editare sau ștergere anunț).
+ *  - nu atinge o poză pe care o mai folosește altă mașină (anunțuri dublate
+ *    înainte de fix împart aceleași fișiere — ștergerea uneia strica cealaltă);
+ *  - o ștergere eșuată nu se pierde: punem poza în ledger cu o dată veche, ca
+ *    sweep-ul s-o reîncerce la următoarea rulare.
+ * Nu aruncă. @returns {Promise<{deleted:number, shared:number, queued:number}>}
+ */
+export async function releaseCarMedia(env, carId, list) {
+    const db = env.DB;
+    const items = (Array.isArray(list) ? list : []).filter((m) => m && ID_RE.test(m.id || ''));
+    const out = { deleted: 0, shared: 0, queued: 0 };
+    await Promise.all(items.map(async (m) => {
+        try {
+            if (await isMediaAttached(db, m.id, carId)) { out.shared++; return; }
+            const dir = DIR_RE.test(m.dir || '') ? m.dir : carId;
+            const ext = EXTS.has(m.ext) ? m.ext : 'jpg';
+            if (await deleteObject(env, `cars/${dir}/${m.id}.${ext}`)) {
+                out.deleted++;
+                await db.prepare('DELETE FROM media_uploads WHERE id = ?').bind(m.id).run();
+            } else {
+                out.queued++;
+                await db.prepare(
+                    `INSERT OR REPLACE INTO media_uploads (id, car_id, ext, uploaded_at)
+                     VALUES (?, ?, ?, datetime('now', '-30 days'))`
+                ).bind(m.id, dir, ext).run();
+            }
+        } catch (err) {
+            console.warn('[media] release', m.id, err.message);
+        }
+    }));
+    if (out.shared || out.queued) console.log(`[media] release ${carId}: ${JSON.stringify(out)}`);
+    return out;
+}
+
+export default {
+    resolveMedia, missingMediaResponse, ledgerDetachStmt, isMediaAttached, releaseCarMedia,
+};

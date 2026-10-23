@@ -92,6 +92,8 @@ export const api = {
             const xhr = new XMLHttpRequest();
             xhr.open('POST', `${BASE}/api/admin/media?${qs.toString()}`);
             xhr.withCredentials = true;           // trimite cookie-ul de sesiune
+            // Fără limită, o conexiune blocată lăsa poza „în upload" la nesfârșit.
+            xhr.timeout = 120000;
             xhr.setRequestHeader('Content-Type', blob.type || 'image/jpeg');
 
             if (onProgress && xhr.upload) {
@@ -106,10 +108,11 @@ export const api = {
                     resolve(data);
                 } else {
                     const msg = (data && (data.error || data.message)) || `Eroare ${xhr.status}`;
-                    reject(new ApiError(msg, xhr.status, data && data.errors));
+                    reject(new ApiError(msg, xhr.status, data && data.errors, data));
                 }
             };
             xhr.onerror = () => reject(new ApiError('Eroare de rețea la încărcare.', 0));
+            xhr.ontimeout = () => reject(new ApiError('Încărcarea a durat prea mult. Reîncearcă.', 0));
             xhr.send(blob);
         });
     },

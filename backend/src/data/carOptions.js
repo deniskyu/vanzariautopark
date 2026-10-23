@@ -121,6 +121,19 @@ const _rawYear = new Date().getFullYear();
 export const currentYear = (_rawYear >= 2024 && _rawYear <= 2100) ? _rawYear : 2026;
 export const YEARS = Array.from({ length: 91 }, (_, i) => currentYear - i);
 
+// Aceeași listă, dar calculată în momentul cererii. Într-un Worker, codul de la
+// nivelul modulului rulează cu ceasul oprit (1970), deci `currentYear` de mai
+// sus cade mereu pe valoarea fixă și nu s-ar mai actualiza în 2027. În
+// interiorul unei cereri ceasul e corect.
+export const yearNow = () => {
+    const y = new Date().getFullYear();
+    return (y >= 2024 && y <= 2100) ? y : currentYear;
+};
+export const yearsNow = () => {
+    const y = yearNow();
+    return Array.from({ length: 91 }, (_, i) => y - i);
+};
+
 // Limitele de caractere. Folosite ȘI la validarea din admin (contor + blocare),
 // ȘI la validarea pe server.
 export const LIMITS = {
@@ -128,6 +141,8 @@ export const LIMITS = {
     description:  4000,   // mult mai lung (era 1500)
     max_photos:   20,
     max_photo_bytes: 15 * 1024 * 1024,
+    max_price:    5000000,   // €, plafon contra zerourilor în plus
+    max_mileage:  2000000,   // km
 };
 
 // Helper: o valoare e permisă? Funcționează pe liste simple și pe {value,label}.
@@ -147,5 +162,5 @@ export const labelOf = (value, list) => {
 export default {
     BRANDS, ENGINE_CAPACITIES, FUEL_TYPES, BODY_TYPES, TRANSMISSIONS,
     DRIVETRAINS, POLLUTION_STANDARDS, COLORS, REGISTRATION_STATUS, STEERING,
-    YEARS, currentYear, LIMITS, isAllowed, labelOf,
+    YEARS, currentYear, yearNow, yearsNow, LIMITS, isAllowed, labelOf,
 };

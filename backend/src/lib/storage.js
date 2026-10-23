@@ -23,13 +23,19 @@ import { AwsClient } from 'aws4fetch';
 
 // Construiește clientul din secretele de mediu. Un client per cerere e ok în
 // Workers (sunt obiecte ieftine), dar îl cache-uim pe `c` dacă e nevoie.
-export const makeClient = (env) => {
+//  `retries`: aws4fetch reîncearcă implicit de 10 ori la erori 5xx, cu pauze
+//  care cresc (zeci de secunde în total). Pentru upload e bine; pentru o
+//  verificare (HEAD) făcută cât patronul așteaptă salvarea, sau pentru o
+//  ștergere în fundal, câteva reîncercări scurte sunt de ajuns — eșecurile
+//  de ștergere sunt reluate oricum de sweep.
+export const makeClient = (env, { retries } = {}) => {
     return new AwsClient({
         accessKeyId: env.B2_ACCESS_KEY_ID,
         secretAccessKey: env.B2_SECRET_ACCESS_KEY,
         service: 's3',
         // Regiunea o extragem din endpoint dacă nu e dată separat.
         region: env.B2_REGION || regionFromEndpoint(env.B2_ENDPOINT) || 'us-west-004',
+        ...(retries !== undefined ? { retries } : {}),
     });
 };
 
@@ -110,7 +116,7 @@ export const putObject = async (env, key, body, contentType) => {
  * când nu putem afla sigur.
  */
 export const headObject = async (env, key) => {
-    const client = makeClient(env);
+    const client = makeClient(env, { retries: 3 });
     const res = await client.fetch(objectUrl(env, key), { method: 'HEAD' });
     if (res.ok) return true;
     if (res.status === 404) return false;
@@ -122,7 +128,7 @@ export const headObject = async (env, key) => {
  */
 export const deleteObject = async (env, key) => {
     try {
-        const client = makeClient(env);
+        const client = makeClient(env, { retries: 3 });
         const res = await client.fetch(objectUrl(env, key), { method: 'DELETE' });
         // B2 întoarce 200 la succes; 404 înseamnă deja șters — ambele ok.
         if (!res.ok && res.status !== 404) {

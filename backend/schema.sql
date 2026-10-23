@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS settings (
     -- Hero (acasă)
     hero_title          TEXT NOT NULL DEFAULT '',
     hero_subtitle       TEXT NOT NULL DEFAULT '',
+    services_title      TEXT NOT NULL DEFAULT '',  -- titlul secțiunii de servicii
 
     -- Servicii: JSON cu 3 obiecte {icon, title, text}
     services            TEXT NOT NULL DEFAULT '[]',

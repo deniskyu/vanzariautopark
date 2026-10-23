@@ -47,7 +47,11 @@
   "vars": {
     "NODE_ENV": "production",
     "B2_ENDPOINT": "https://s3.eu-central-003.backblazeb2.com",
-    "B2_BUCKET_NAME": "vanzariautopark-media"
+    "B2_BUCKET_NAME": "vanzariautopark-media",
+    // Domeniul public al site-ului: apare în canonical, og:image (previzualizarea
+    // linkurilor pe WhatsApp/Facebook), JSON-LD și sitemap. Schimbă-l aici dacă
+    // site-ul se mută pe alt domeniu.
+    "SITE_DOMAIN": "vanzariautopark.com"
   }
 
   // Secretele (ADMIN_PASSWORD, ADMIN_ORIGIN, B2_ACCESS_KEY_ID,

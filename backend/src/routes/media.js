@@ -29,6 +29,10 @@ import {
     makeClient, mediaId, extFromType, sniffImage, putObject, deleteObject, carKey,
 } from '../lib/storage.js';
 import { LIMITS } from '../data/carOptions.js';
+import { isMediaAttached } from '../lib/mediaCheck.js';
+
+const DIR_RE = /^[a-zA-Z0-9_-]{1,64}$/;
+const FILE_RE = /^[a-f0-9]{24}\.(jpg|png|webp)$/;
 
 const MAX_BYTES = LIMITS.max_photo_bytes;   // 15 MB
 
@@ -48,6 +52,8 @@ adminMedia.post('/', async (c) => {
     // pe care îl mutăm la salvare. Mai simplu: cerem car_id doar la editare;
     // la adăugare punem într-un id de sesiune de upload.
     const carId = c.req.query('car_id') || c.req.query('draft_id') || 'draft';
+    // Folderul ajunge în cheia din B2 — doar litere, cifre, _ și -, ca la servire.
+    if (!DIR_RE.test(carId)) return c.json({ ok: false, error: 'Identificator de dosar invalid.' }, 400);
 
     // Citim corpul ca bytes.
     let bytes;
@@ -111,8 +117,21 @@ adminMedia.delete('/:carId/:file', async (c) => {
     const env = c.env;
     const { carId, file } = c.req.param();
 
-    if (!/^[a-f0-9]{24}\.(jpg|png|webp)$/.test(file) || !/^[a-zA-Z0-9_-]+$/.test(carId)) {
+    if (!FILE_RE.test(file) || !DIR_RE.test(carId)) {
         return c.json({ ok: false, error: 'Identificator invalid.' }, 400);
+    }
+
+    // Plasă de siguranță: o poză care face parte dintr-un anunț salvat NU se
+    // șterge de aici. Pozele scoase la editare se șterg abia când anunțul e
+    // salvat (PUT), altfel „✕" + Anulează lăsa anunțul live cu poza moartă.
+    const mediaIdPart = file.slice(0, file.lastIndexOf('.'));
+    try {
+        if (await isMediaAttached(env.DB, mediaIdPart)) {
+            return c.json({ ok: false, attached: true, error: 'Poza face parte dintr-un anunț salvat; se șterge la salvarea anunțului.' }, 409);
+        }
+    } catch (err) {
+        console.warn('[media] attached check:', err.message);
+        return c.json({ ok: false, error: 'Nu am putut verifica poza. Încearcă din nou.' }, 502);
     }
 
     const key = `cars/${carId}/${file}`;
@@ -120,7 +139,6 @@ adminMedia.delete('/:carId/:file', async (c) => {
     if (!okDel) return c.json({ ok: false, error: 'Eroare la ștergerea imaginii.' }, 502);
 
     // curățăm și rândul din ledger — best-effort, nu blocăm răspunsul dacă eșuează
-    const mediaIdPart = file.slice(0, file.lastIndexOf('.'));
     c.executionCtx?.waitUntil?.(
         env.DB.prepare('DELETE FROM media_uploads WHERE id = ?').bind(mediaIdPart).run()
             .catch((err) => console.warn('[media] ledger delete:', err.message))
@@ -131,45 +149,75 @@ adminMedia.delete('/:carId/:file', async (c) => {
 
 // ── SERVIRE (public) ─────────────────────────────────────────────────────────
 //  GET /media/cars/:carId/:file
-//  Citim din B2 și întoarcem. Cache lung; Cloudflare cache-uiește la edge.
+//  Citim din B2 și întoarcem. Răspunsurile 200 se pun în cache-ul Cloudflare
+//  de la edge (Cache API), deci a doua cerere pentru aceeași poză nu mai ajunge
+//  la B2. Pe *.workers.dev cache-ul nu există — merge, doar fără cache.
+//
+//  Doar un 404 real de la B2 înseamnă „poza lipsește". Orice altă eroare (B2
+//  căzut, cheie expirată) întoarce 502, ca să nu pară un anunț stricat — și
+//  niciuna dintre erori nu se pune în cache.
 const media = new Hono();
+
+const noStore = (status, text) => new Response(text, {
+    status,
+    headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' },
+});
 
 media.get('/cars/:carId/:file', async (c) => {
     const env = c.env;
     const { carId, file } = c.req.param();
 
     // Validare strictă a numelui — doar id.ext, fără căi.
-    if (!/^[a-f0-9]{24}\.(jpg|png|webp)$/.test(file) || !/^[a-zA-Z0-9_-]+$/.test(carId)) {
-        return c.notFound();
+    if (!FILE_RE.test(file) || !DIR_RE.test(carId)) return noStore(404, 'Not found');
+
+    const cache = typeof caches !== 'undefined' ? caches.default : null;
+    const keyUrl = new URL(c.req.url);
+    keyUrl.search = '';
+    const cacheKey = new Request(keyUrl.toString(), { method: 'GET' });
+
+    if (cache) {
+        try {
+            const hit = await cache.match(cacheKey);
+            if (hit) return hit;
+        } catch { /* cache indisponibil — mergem la B2 */ }
     }
 
     const key = `cars/${carId}/${file}`;
     const base = String(env.B2_ENDPOINT || '').replace(/\/+$/, '');
     const url = `${base}/${env.B2_BUCKET_NAME}/${key}`;
 
+    let res;
     try {
         // Bucketul e public — putem citi direct, fără semnătură. Dar semnăm
         // oricum, ca să meargă și dacă bucketul devine privat.
         const client = makeClient(env);
         const signed = await client.sign(url, { method: 'GET' });
-        const res = await fetch(signed);
-
-        if (!res.ok) return c.notFound();
-
-        const type = file.endsWith('.png') ? 'image/png'
-            : file.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
-
-        return new Response(res.body, {
-            status: 200,
-            headers: {
-                'content-type': type,
-                'cache-control': 'public, max-age=31536000, immutable',
-            },
-        });
+        res = await fetch(signed);
     } catch (err) {
         console.error('[media] serve:', err.message);
-        return c.notFound();
+        return noStore(502, 'Storage unavailable');
     }
+
+    if (res.status === 404) return noStore(404, 'Not found');
+    if (!res.ok) {
+        console.error(`[media] serve ${key} → B2 ${res.status}`);
+        return noStore(502, 'Storage error');
+    }
+
+    const type = file.endsWith('.png') ? 'image/png'
+        : file.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+
+    const out = new Response(res.body, {
+        status: 200,
+        headers: {
+            'content-type': type,
+            'cache-control': 'public, max-age=31536000, immutable',
+        },
+    });
+    if (cache) {
+        c.executionCtx?.waitUntil?.(cache.put(cacheKey, out.clone()).catch(() => {}));
+    }
+    return out;
 });
 
 export { adminMedia, media };

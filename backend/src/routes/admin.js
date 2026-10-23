@@ -14,7 +14,7 @@ import {
 import {
     BRANDS, ENGINE_CAPACITIES, FUEL_TYPES, BODY_TYPES, TRANSMISSIONS,
     DRIVETRAINS, POLLUTION_STANDARDS, COLORS, REGISTRATION_STATUS, STEERING,
-    YEARS, LIMITS,
+    YEARS, LIMITS, yearsNow,
 } from '../data/carOptions.js';
 
 const admin = new Hono();
@@ -76,7 +76,7 @@ admin.get('/options', requireAuth, (c) => {
             colors: COLORS,
             registration_status: REGISTRATION_STATUS,
             steering: STEERING,
-            years: YEARS,
+            years: yearsNow(),
             limits: LIMITS,
         },
     });

@@ -13,6 +13,7 @@ import { html, raw } from '../html.js';
 import { Layout } from '../layout.js';
 import { Header, Footer, StickyWhatsApp, CarCard } from '../components.js';
 import { Filters, StockBar, Pagination } from '../blocks.js';
+import { telHref } from '../../lib/carUtils.js';
 
 export const renderStoc = (site, { cars, total, page, pages, q, availableBrands }) => {
     // Titlu adaptat la filtrul de marcă, pentru SEO.
@@ -59,7 +60,7 @@ ${Header(site, 'stoc')}
           <p style="font-size:1.1rem;margin-bottom:.5rem">Mașinile se încarcă în curând pe site.</p>
           <p>Sună-ne pentru oferta disponibilă acum în parc.</p>
           <div class="stock-cta">
-            <a class="btn btn--primary" href="tel:${site.phone_primary}">Sună acum</a>
+            <a class="btn btn--primary" href="tel:${telHref(site.phone_primary)}">Sună acum</a>
           </div>
         `}
       </div>

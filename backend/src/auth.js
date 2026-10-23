@@ -30,6 +30,11 @@ export const createSession = async (c, db) => {
     await db.prepare('INSERT INTO sessions (token, expires_at) VALUES (?, ?)')
         .bind(token, expires).run();
 
+    setSessionCookie(c, token);
+    return token;
+};
+
+const setSessionCookie = (c, token) => {
     setCookie(c, COOKIE_NAME, token, {
         httpOnly: true,
         secure: true,
@@ -38,7 +43,6 @@ export const createSession = async (c, db) => {
         domain: '.vanzariautopark.com',
         maxAge: SESSION_DAYS * 24 * 3600,
     });
-    return token;
 };
 
 export const readSession = async (c, db) => {
@@ -53,6 +57,20 @@ export const readSession = async (c, db) => {
         await db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
         deleteCookie(c, COOKIE_NAME, { path: '/', domain: '.vanzariautopark.com' });
         return null;
+    }
+
+    // Sesiune care se prelungește: dacă patronul folosește panoul, nu-l mai
+    // scoate afară la fix 7 zile după login (în mijlocul unui anunț). Când a
+    // trecut jumătate din durată, o reînnoim la 7 zile întregi.
+    const left = new Date(row.expires_at).getTime() - Date.now();
+    if (left < SESSION_MS / 2) {
+        try {
+            const expires = new Date(Date.now() + SESSION_MS).toISOString();
+            await db.prepare('UPDATE sessions SET expires_at = ? WHERE token = ?').bind(expires, token).run();
+            setSessionCookie(c, token);
+        } catch (err) {
+            console.warn('[auth] prelungire sesiune:', err.message);
+        }
     }
     return { token };
 };

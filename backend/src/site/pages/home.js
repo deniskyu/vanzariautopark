@@ -17,6 +17,7 @@ import { html, raw } from '../html.js';
 import { icon } from '../icons.js';
 import { Layout } from '../layout.js';
 import { Header, Footer, StickyWhatsApp, CarCard, waLink } from '../components.js';
+import { telHref, formatPhoneDisplay } from '../../lib/carUtils.js';
 
 // Cele 5 imagini de hero din assets (landing1-5).
 const HERO_IMAGES = [
@@ -119,7 +120,7 @@ ${Header(site, 'home')}
         <p style="font-size:1.1rem;margin-bottom:.5rem">Mașinile se încarcă în curând pe site.</p>
         <p>Până atunci, sună-ne direct pentru oferta disponibilă în parc.</p>
         <div class="stock-cta">
-          <a class="btn btn--primary" href="tel:${site.phone_primary}">
+          <a class="btn btn--primary" href="tel:${telHref(site.phone_primary)}">
             ${raw(icon('phone', 18))} Sună acum
           </a>
         </div>
@@ -135,8 +136,8 @@ ${Header(site, 'home')}
         <p>Sună-ne sau scrie-ne pe WhatsApp. Îți răspundem rapid.</p>
       </div>
       <div class="cta-actions">
-        <a class="cta-phone" href="tel:${site.phone_primary}">
-          ${raw(icon('phone', 20))} ${site.phone_primary}
+        <a class="cta-phone" href="tel:${telHref(site.phone_primary)}">
+          ${raw(icon('phone', 20))} ${formatPhoneDisplay(site.phone_primary)}
         </a>
         <a class="btn" style="background:#0a0a0a;color:#E5FB14" href="/contact">
           Detalii contact
@@ -157,9 +158,9 @@ ${StickyWhatsApp(site)}
         title: '',   // pe acasă, doar numele parcului
         description: site.meta_description
             || `${site.display_name} — parc auto la intrarea în Botoșani dinspre Suceava. Mașini verificate, finanțare în rate prin TBI Bank. Deservim Botoșani, Suceava și împrejurimile.`,
-        canonical: `https://${site.domain || 'vanzariautopark.ro'}/`,
+        canonical: `https://${site.domain || 'vanzariautopark.com'}/`,
         current: 'home',
-        ogImage: HERO_IMAGES[0],
+        ogImage: `https://${site.domain || 'vanzariautopark.com'}${HERO_IMAGES[0]}`,
         head: raw(`<script type="application/ld+json">${autoDealerLd(site)}</script>`),
         body,
     });
@@ -215,7 +216,7 @@ export const DEFAULT_SERVICES = [
 //  Semnalul care spune Google că acesta e un dealer auto local, cu adresă,
 //  program și zonă deservită. Esențial pentru „parc auto Botoșani".
 const autoDealerLd = (site) => {
-    const domain = site.domain || 'vanzariautopark.ro';
+    const domain = site.domain || 'vanzariautopark.com';
     const DAY = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
     const schedule = Array.isArray(site.schedule) ? site.schedule : [];
     const hours = schedule.filter((d) => !d.closed).map((d) => ({
@@ -230,7 +231,7 @@ const autoDealerLd = (site) => {
         name: site.display_name,
         url: `https://${domain}/`,
         image: `https://${domain}/assets/logo.png`,
-        telephone: '+' + String(site.phone_primary || '').replace(/\D/g, ''),
+        telephone: telHref(site.phone_primary) || undefined,
         email: site.email || undefined,
         address: {
             '@type': 'PostalAddress',

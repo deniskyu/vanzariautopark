@@ -11,7 +11,7 @@
 
 import { Hono } from 'hono';
 import { requireAuth } from '../auth.js';
-import { normalizePhone } from '../lib/carUtils.js';
+import { normalizePhone, isValidPhone } from '../lib/carUtils.js';
 
 const settings = new Hono();
 
@@ -31,6 +31,19 @@ const LIMITS = {
 };
 
 const clean = (v) => (v == null ? '' : String(v).trim());
+
+// Coloanele tabelului settings (citite o dată per instanță de Worker).
+let _columns = null;
+const settingsColumns = async (db) => {
+    if (_columns) return _columns;
+    try {
+        const { results } = await db.prepare('PRAGMA table_info(settings)').all();
+        if (results && results.length) _columns = new Set(results.map((r) => r.name));
+    } catch (err) {
+        console.warn('[settings] PRAGMA:', err.message);
+    }
+    return _columns;   // null = nu știm; încercăm toate câmpurile
+};
 
 // ── GET: citire (pentru panou) ───────────────────────────────────────────────
 settings.get('/', requireAuth, async (c) => {
@@ -80,7 +93,7 @@ settings.put('/', requireAuth, async (c) => {
     for (const key of ['phone_primary', 'phone_secondary', 'whatsapp']) {
         if (!(key in b)) continue;
         const norm = normalizePhone(b[key]);
-        if (norm && (norm.length < 10 || norm.length > 15)) {
+        if (norm && !isValidPhone(norm)) {
             errors.push(`Numărul „${key}" are un format nevalid.`);
         } else {
             data[key] = norm;
@@ -110,14 +123,25 @@ settings.put('/', requireAuth, async (c) => {
     if (errors.length) return c.json({ ok: false, errors }, 400);
     if (Object.keys(data).length === 0) return c.json({ ok: true }); // nimic de schimbat
 
+    // Doar coloanele care există efectiv în tabel. Baza de date din producție
+    // poate fi mai veche decât schema.sql (ex. `services_title` lipsea) — atunci
+    // un singur câmp necunoscut făcea toată salvarea să eșueze cu 500.
+    const columns = await settingsColumns(c.env.DB);
+
     // Construim UPDATE dinamic, doar cu câmpurile trimise.
     const sets = [];
     const binds = [];
     for (const [k, v] of Object.entries(data)) {
+        const col = k === '_services_json' ? 'services' : k;
+        if (columns && !columns.has(col)) {
+            console.warn(`[settings] coloana „${col}" lipsește din DB — câmp ignorat`);
+            continue;
+        }
         if (k === '_services_json') { sets.push('services = ?'); binds.push(v); }
         else { sets.push(`${k} = ?`); binds.push(v); }
     }
-    sets.push("updated_at = datetime('now')");
+    if (!sets.length) return c.json({ ok: true });
+    if (!columns || columns.has('updated_at')) sets.push("updated_at = datetime('now')");
 
     try {
         await c.env.DB.prepare(`UPDATE settings SET ${sets.join(', ')} WHERE id = 1`)

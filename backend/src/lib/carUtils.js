@@ -8,7 +8,7 @@
 import {
     BRANDS, ENGINE_CAPACITIES, FUEL_TYPES, BODY_TYPES, TRANSMISSIONS,
     DRIVETRAINS, POLLUTION_STANDARDS, COLORS, REGISTRATION_STATUS, STEERING,
-    LIMITS, isAllowed,
+    LIMITS, isAllowed, yearNow,
 } from '../data/carOptions.js';
 
 // ─── Slug ────────────────────────────────────────────────────────────────────
@@ -44,14 +44,45 @@ export const generateCarSlug = (title, brand, year) => {
 
 // ─── Telefon ─────────────────────────────────────────────────────────────────
 // 0753637151 → 40753637151 (format internațional, fără plus, pentru wa.me)
+//   +40 0753 637 151 → 40753637151   (0-ul în plus după prefix e scos)
+//   0037369123456    → 37369123456   (prefix internațional 00 → fără)
 export const normalizePhone = (raw) => {
     let d = String(raw || '').replace(/\D/g, '');
     if (!d) return '';
-    if (d.startsWith('0040')) d = d.slice(2);
+    if (d.startsWith('00')) d = d.slice(2);                 // 0040…, 00373…
     else if (d.startsWith('40') && d.length >= 11) { /* deja ok */ }
     else if (d.startsWith('0')) d = '40' + d.slice(1);
     else if (d.length === 9) d = '40' + d;
+    // „+40 07…" → 4007… : prefixul plus 0-ul național, des întâlnit
+    if (d.startsWith('400') && d.length === 12) d = '40' + d.slice(3);
     return d;
+};
+
+// Un număr normalizat e valid? Românesc (40…) = exact 11 cifre; străin = 10–15.
+export const isValidPhone = (norm) => {
+    if (!norm) return false;
+    if (norm.startsWith('40')) return norm.length === 11;
+    return norm.length >= 10 && norm.length <= 15;
+};
+
+// ─── Numere întregi scrise de om ─────────────────────────────────────────────
+//  „4300", „4.300", „4,300", „4 300" → 4300. Separatorul de mii e acceptat doar
+//  în grupe corecte de câte 3 cifre. „4300.50" sau „4.3" sunt REFUZATE: înainte
+//  se scoteau punctele și „4300.50" devenea 430.050 €.
+//  @returns { value: number|null, error: boolean } — value null = gol.
+export const parseWholeNumber = (v) => {
+    if (v === null || v === undefined || v === '') return { value: null, error: false };
+    if (typeof v === 'number') {
+        return Number.isInteger(v) ? { value: v, error: false } : { value: null, error: true };
+    }
+    const s = String(v).trim().replace(/[\s ]/g, '');
+    if (!s) return { value: null, error: false };
+    if (/^-?\d+$/.test(s)) return { value: parseInt(s, 10), error: false };
+    // un singur tip de separator, în grupe de 3: 4.300 / 1.250.000 / 4,300
+    if (/^\d{1,3}(\.\d{3})+$/.test(s) || /^\d{1,3}(,\d{3})+$/.test(s)) {
+        return { value: parseInt(s.replace(/[.,]/g, ''), 10), error: false };
+    }
+    return { value: null, error: true };
 };
 
 // 40753637151 → '0753 637 151' (pentru afișare)
@@ -69,10 +100,6 @@ export const telHref = (raw) => {
 
 // ─── Curățare text ───────────────────────────────────────────────────────────
 export const clean = (t) => (t == null ? '' : String(t).trim());
-const toInt = (v) => {
-    const n = parseInt(String(v ?? '').replace(/[^0-9-]/g, ''), 10);
-    return Number.isFinite(n) ? n : null;
-};
 
 // ─── Validarea unui anunț ────────────────────────────────────────────────────
 //  Se apelează pe SERVER, la creare și editare.
@@ -94,15 +121,26 @@ export const validateCar = (body = {}) => {
     if (description.length > LIMITS.description)
         e.push(`Descrierea depășește ${LIMITS.description} de caractere.`);
 
-    // Numere
-    const price = toInt(body.price);
-    const mileage = toInt(body.mileage);
-    const year = toInt(body.production_year);
-    const hp = toInt(body.horsepower);
+    // Numere — întregi, fără zecimale (vezi parseWholeNumber).
+    const p = parseWholeNumber(body.price);
+    const km = parseWholeNumber(body.mileage);
+    const yr = parseWholeNumber(body.production_year);
+    const hpP = parseWholeNumber(body.horsepower);
+    const price = p.value, mileage = km.value, year = yr.value, hp = hpP.value;
 
-    if (price === null || price <= 0) e.push('Prețul trebuie să fie un număr pozitiv.');
-    if (mileage === null || mileage < 0) e.push('Kilometrajul trebuie să fie un număr.');
-    if (hp !== null && (hp < 0 || hp > 2000)) e.push('Puterea are o valoare nevalidă.');
+    if (p.error) e.push('Prețul trebuie scris ca număr întreg, fără zecimale (ex. 4300 sau 4.300).');
+    else if (price === null || price <= 0) e.push('Prețul trebuie să fie un număr pozitiv.');
+    else if (price > LIMITS.max_price) e.push(`Prețul pare greșit (peste ${LIMITS.max_price.toLocaleString('ro-RO')} €).`);
+
+    if (km.error) e.push('Kilometrajul trebuie scris ca număr întreg, fără zecimale (ex. 266500).');
+    else if (mileage === null || mileage < 0) e.push('Kilometrajul trebuie să fie un număr.');
+    else if (mileage > LIMITS.max_mileage) e.push('Kilometrajul pare greșit (prea mare).');
+
+    const maxYear = yearNow() + 1;
+    if (yr.error || year === null) e.push('Alege anul de fabricație.');
+    else if (year < 1900 || year > maxYear) e.push('Anul de fabricație nu este valid.');
+
+    if (hpP.error || (hp !== null && (hp < 0 || hp > 2000))) e.push('Puterea are o valoare nevalidă.');
 
     // Liste
     const checks = [
@@ -127,8 +165,8 @@ export const validateCar = (body = {}) => {
 
     // Telefon: dacă e gol, se completează în rută cu numărul parcului.
     const phone = normalizePhone(body.phone);
-    if (phone && (phone.length < 10 || phone.length > 15))
-        e.push('Numărul de telefon are un format nevalid.');
+    if (phone && !isValidPhone(phone))
+        e.push('Numărul de telefon are un format nevalid (ex. 0753 637 151).');
 
     const steering = clean(body.steering_wheel) === 'right' ? 'right' : 'left';
 
@@ -163,6 +201,6 @@ export const validateCar = (body = {}) => {
 };
 
 export default {
-    slugify, generateCarSlug, normalizePhone, formatPhoneDisplay, telHref,
-    clean, validateCar,
+    slugify, generateCarSlug, normalizePhone, isValidPhone, parseWholeNumber,
+    formatPhoneDisplay, telHref, clean, validateCar,
 };

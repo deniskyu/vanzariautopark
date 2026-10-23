@@ -40,7 +40,7 @@ export async function sweepOrphanedMedia(env) {
         return { checked: 0, deleted: 0, attached: 0 };
     }
 
-    let deleted = 0, attached = 0;
+    let deleted = 0, attached = 0, failed = 0;
 
     for (const r of candidates) {
         // id-ul e mereu hex (vezi mediaId() din storage.js) — sigur pentru
@@ -53,16 +53,22 @@ export async function sweepOrphanedMedia(env) {
             attached++;
         } else {
             const key = `cars/${r.car_id}/${r.id}.${r.ext}`;
-            if (await deleteObject(env, key)) deleted++;
+            if (await deleteObject(env, key)) {
+                deleted++;
+            } else {
+                // B2 n-a răspuns bine — păstrăm rândul, se reîncearcă data viitoare
+                failed++;
+                continue;
+            }
         }
 
-        // rândul și-a făcut treaba în ambele cazuri — îl scoatem din ledger,
+        // rândul și-a făcut treaba — îl scoatem din ledger,
         // altfel tabelul crește la nesfârșit
         await db.prepare('DELETE FROM media_uploads WHERE id = ?').bind(r.id).run();
     }
 
-    console.log(`[sweep] verificate ${candidates.length}, atașate ${attached}, șterse ${deleted}`);
-    return { checked: candidates.length, deleted, attached };
+    console.log(`[sweep] verificate ${candidates.length}, atașate ${attached}, șterse ${deleted}, eșuate ${failed}`);
+    return { checked: candidates.length, deleted, attached, failed };
 }
 
 export default { sweepOrphanedMedia };
