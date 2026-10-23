@@ -9,12 +9,18 @@
 //  media veche (din DB) și media nouă (trimisă din formular) și ștergem din B2
 //  orice poză scoasă — altfel rămânea orfană (Strat 2 din strategia anti-orfani,
 //  vezi și media.js pentru Stratul 1 și src/lib/sweep.js pentru Stratul 3).
+//
+//  La POST și PUT, lista `media` trece prin resolveMedia (lib/mediaCheck.js):
+//  refuzăm salvarea dacă vreo poză nouă nu mai există în B2, iar pozele
+//  acceptate sunt scoase din ledger în aceeași tranzacție cu salvarea — de
+//  acolo încolo sweep-ul nu mai are ce căuta la ele.
 // ============================================================================
 
 import { Hono } from 'hono';
 import { requireAuth } from '../auth.js';
 import { validateCar, generateCarSlug, normalizePhone } from '../lib/carUtils.js';
 import { deleteCarMedia } from '../lib/storage.js';
+import { resolveMedia, missingMediaResponse, ledgerDetachStmt } from '../lib/mediaCheck.js';
 import {
     BRANDS, FUEL_TYPES, POLLUTION_STANDARDS, ENGINE_CAPACITIES, LIMITS,
 } from '../data/carOptions.js';
@@ -211,9 +217,28 @@ adminCars.get('/:id', async (c) => {
     }
 });
 
+// ── Verificarea pozelor, comună pentru POST și PUT ──────────────────────────
+//  Întoarce { media, attachIds } sau { response } dacă salvarea trebuie oprită.
+const checkMedia = async (c, rawMedia, oldMedia = []) => {
+    const list = Array.isArray(rawMedia) ? rawMedia.slice(0, LIMITS.max_photos) : [];
+    let r;
+    try {
+        r = await resolveMedia(c.env, list, oldMedia);
+    } catch (err) {
+        console.error('[adminCars] media check:', err.message);
+        return { response: c.json({ ok: false, error: 'Nu am putut verifica pozele. Încearcă din nou.' }, 502) };
+    }
+    if (r.invalid) return { response: c.json({ ok: false, errors: ['Listă de poze invalidă.'] }, 400) };
+    if (r.missing.length) {
+        console.warn(`[adminCars] ${r.missing.length} poze lipsă din B2: ${r.missing.join(', ')}`);
+        return { response: c.json(missingMediaResponse(r.missing), 409) };
+    }
+    return { media: r.media, attachIds: r.attachIds };
+};
+
 // ── Adăugare ─────────────────────────────────────────────────────────────────
-//  Media vine ca array deja procesat (Batch 3 se ocupă de upload înainte).
-//  Aici doar validăm câmpurile și scriem rândul.
+//  Media vine ca array de poze deja urcate (vezi media.js). Validăm câmpurile,
+//  verificăm că pozele încă există, apoi scriem rândul.
 adminCars.post('/', async (c) => {
     const db = c.env.DB;
     let body;
@@ -230,16 +255,17 @@ adminCars.post('/', async (c) => {
         phone = normalizePhone(s?.phone_primary) || '';
     }
 
-    // Media: acceptăm doar un array; forma detaliată se validează în Batch 3.
-    let media = [];
-    if (Array.isArray(body.media)) media = body.media.slice(0, LIMITS.max_photos);
+    // Media: doar poze care chiar există în B2 (vezi lib/mediaCheck.js).
+    const mc = await checkMedia(c, body.media);
+    if (mc.response) return mc.response;
+    const { media, attachIds } = mc;
 
     const id = nanoid();
     const slug = generateCarSlug(v.data.title, v.data.brand, v.data.production_year);
     const status = body.status === 'draft' ? 'draft' : 'published';
 
     try {
-        await db.prepare(`
+        const insert = db.prepare(`
             INSERT INTO cars (
                 id, slug, title, brand, production_year, price, negotiable, mileage,
                 fuel, engine_capacity, horsepower, pollution_standard, body_type, color,
@@ -253,7 +279,11 @@ adminCars.post('/', async (c) => {
             v.data.transmission, v.data.drivetrain, v.data.steering_wheel, v.data.vin,
             v.data.registration_status, v.data.for_dismantling, v.data.description,
             phone, JSON.stringify(media), status
-        ).run();
+        );
+
+        // Inserarea + scoaterea pozelor din ledger, atomic (o singură tranzacție).
+        const detach = ledgerDetachStmt(db, attachIds);
+        await db.batch(detach ? [insert, detach] : [insert]);
 
         return c.json({ ok: true, id, slug });
     } catch (err) {
@@ -286,15 +316,18 @@ adminCars.put('/:id', async (c) => {
         phone = normalizePhone(s?.phone_primary) || '';
     }
 
-    let media = [];
-    if (Array.isArray(body.media)) media = body.media.slice(0, LIMITS.max_photos);
+    let oldMedia = [];
+    try { oldMedia = JSON.parse(existing.media || '[]'); } catch {}
+
+    // Pozele deja pe mașină trec direct; cele noi trebuie să existe în B2.
+    const mc = await checkMedia(c, body.media, oldMedia);
+    if (mc.response) return mc.response;
+    const { media, attachIds } = mc;
 
     // ── Diff media (Strat 2 anti-orfani) ──────────────────────────────────
     //  Orice poză care era în `media` veche dar nu mai apare în lista nouă
     //  a fost scoasă din formular — trebuie ștearsă și din B2, nu doar din
     //  rândul din DB. Fără asta, pozele înlocuite la editare rămân orfane.
-    let oldMedia = [];
-    try { oldMedia = JSON.parse(existing.media || '[]'); } catch {}
     const newIds = new Set(media.map((m) => m && m.id).filter(Boolean));
     const removed = oldMedia.filter((m) => m && m.id && !newIds.has(m.id));
 
@@ -307,7 +340,7 @@ adminCars.put('/:id', async (c) => {
     }
 
     try {
-        await db.prepare(`
+        const update = db.prepare(`
             UPDATE cars SET
                 title=?, price=?, negotiable=?, mileage=?, fuel=?, engine_capacity=?,
                 horsepower=?, pollution_standard=?, body_type=?, color=?, transmission=?,
@@ -322,7 +355,11 @@ adminCars.put('/:id', async (c) => {
             v.data.steering_wheel, v.data.vin, v.data.registration_status,
             v.data.for_dismantling, v.data.description, phone, JSON.stringify(media),
             ...statusBinds, id
-        ).run();
+        );
+
+        // Actualizarea + scoaterea pozelor noi din ledger, atomic.
+        const detach = ledgerDetachStmt(db, attachIds);
+        await db.batch(detach ? [update, detach] : [update]);
 
         // Ștergem din B2 pozele scoase — în fundal, nu blocăm răspunsul, și nu
         // eșuăm salvarea mașinii dacă ștergerea din B2 dă vreo eroare.

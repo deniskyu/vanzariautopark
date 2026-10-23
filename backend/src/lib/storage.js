@@ -104,6 +104,20 @@ export const putObject = async (env, key, body, contentType) => {
 };
 
 /**
+ * Verifică dacă un obiect există (și nu e ascuns) în B2.
+ * @returns {Promise<boolean>} true = există, false = 404 (lipsă sau ascuns)
+ * Aruncă la orice alt răspuns (rețea, 5xx, 403) — apelantul decide ce face
+ * când nu putem afla sigur.
+ */
+export const headObject = async (env, key) => {
+    const client = makeClient(env);
+    const res = await client.fetch(objectUrl(env, key), { method: 'HEAD' });
+    if (res.ok) return true;
+    if (res.status === 404) return false;
+    throw new Error(`HEAD ${key} → ${res.status}`);
+};
+
+/**
  * Șterge un obiect din B2. Best-effort — nu aruncă.
  */
 export const deleteObject = async (env, key) => {
@@ -146,5 +160,5 @@ export const carKey = (carId, id, ext) => `cars/${carId}/${id}.${ext || 'jpg'}`;
 
 export default {
     makeClient, mediaId, extFromType, sniffImage,
-    putObject, deleteObject, deleteCarMedia, carKey,
+    putObject, headObject, deleteObject, deleteCarMedia, carKey,
 };

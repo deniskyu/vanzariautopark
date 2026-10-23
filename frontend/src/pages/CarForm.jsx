@@ -31,6 +31,8 @@ export default function CarForm() {
     const [errors, setErrors] = useState([]);
     const [toast, setToast] = useState(null);
     const [media, setMedia] = useState([]);
+    // id-urile pozelor pe care serverul le-a raportat ca lipsă din B2 (409)
+    const [brokenIds, setBrokenIds] = useState([]);
     const draftId = useRef(isEdit ? id : newDraftId()).current;
 
     // valorile formularului
@@ -138,6 +140,7 @@ export default function CarForm() {
             setTimeout(() => navigate('/'), 700);
         } catch (err) {
             setErrors(err.errors && err.errors.length ? err.errors : [err.message]);
+            setBrokenIds(err.data?.missing_media || []);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } finally {
             setSaving(false);
@@ -180,7 +183,8 @@ export default function CarForm() {
                 {/* ── Poze ── */}
                 <section className="form-section">
                     <h2>Fotografii</h2>
-                    <PhotoUploader draftId={draftId} initial={media} onChange={setMedia} apiBase={API_BASE} />
+                    <PhotoUploader draftId={draftId} initial={media} onChange={setMedia} apiBase={API_BASE}
+                                   brokenIds={brokenIds} />
                 </section>
 
                 {/* ── Identificare ── */}

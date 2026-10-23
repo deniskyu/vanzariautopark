@@ -15,11 +15,17 @@
 //
 //  Rulează din src/index.js, la fiecare execuție a Cron Trigger-ului definit
 //  în wrangler.jsonc (vezi „triggers.crons").
+//
+//  STALE_HOURS e generos (7 zile): un anunț se poate completa în reprize, cu
+//  tabul lăsat deschis zile întregi. La 24h, pozele unui formular deschis de
+//  2 zile erau șterse înainte de „Salvează". Salvarea scoate acum pozele din
+//  ledger (vezi lib/mediaCheck.js), deci aici ajung doar pozele chiar
+//  abandonate — pentru ele, câteva zile în plus în B2 nu costă nimic.
 // ============================================================================
 
 import { deleteObject } from './storage.js';
 
-const STALE_HOURS = 24;
+const STALE_HOURS = 24 * 7;
 
 export async function sweepOrphanedMedia(env) {
     const db = env.DB;

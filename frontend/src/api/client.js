@@ -13,11 +13,13 @@
 const BASE = import.meta.env.VITE_API_URL || '';
 
 // Eroare cu detalii, ca UI-ul să poată afișa mesajul corect și lista de erori.
+//  `data` = corpul complet al răspunsului (ex. `missing_media` la 409).
 export class ApiError extends Error {
-    constructor(message, status, errors) {
+    constructor(message, status, errors, data) {
         super(message);
         this.status = status;
         this.errors = errors || null;
+        this.data = data || null;
     }
 }
 
@@ -48,7 +50,7 @@ async function request(path, { method = 'GET', body, isForm = false } = {}) {
 
     if (!res.ok || (data && data.ok === false)) {
         const msg = (data && (data.error || data.message)) || `Eroare ${res.status}`;
-        throw new ApiError(msg, res.status, data && data.errors);
+        throw new ApiError(msg, res.status, data && data.errors, data);
     }
     return data;
 }

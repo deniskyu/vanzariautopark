@@ -23,7 +23,10 @@ import { compressImage, isAcceptedImage, formatBytes } from '../lib/imageCompres
 
 const MAX_PHOTOS = 20;
 
-export default function PhotoUploader({ draftId, initial = [], onChange, apiBase = '' }) {
+//  brokenIds: id-uri pe care serverul le-a raportat ca lipsă din B2 la salvare
+//  (formular ținut deschis prea mult → pozele au fost curățate de sweep).
+//  Le marcăm „Expirată", ca userul să le scoată și să le urce din nou.
+export default function PhotoUploader({ draftId, initial = [], onChange, apiBase = '', brokenIds = [] }) {
     // Pozele deja urcate (din editare) vin ca { id, ext, w, h }.
     const [photos, setPhotos] = useState(() =>
         initial.map((m) => ({ ...m, dir: m.dir || m.car_id, status: 'done', progress: 100 }))
@@ -140,14 +143,17 @@ export default function PhotoUploader({ draftId, initial = [], onChange, apiBase
             <div className="photo-grid">
                 {photos.map((p, i) => {
                     const key = p.id || p.tmpId;
+                    const broken = p.status === 'done' && brokenIds.includes(p.id);
                     return (
-                        <div className={`photo${p.status === 'error' ? ' is-error' : ''}`}
+                        <div className={`photo${p.status === 'error' || broken ? ' is-error' : ''}`}
                              key={key}
                              draggable={p.status === 'done'}
                              onDragStart={() => onDragStart(i)}
                              onDragOver={(e) => e.preventDefault()}
                              onDrop={() => onDrop(i)}>
-                            {p.status === 'done'
+                            {broken
+                                ? <div className="photo-err" title="Poza nu mai există pe server. Șterge-o și urc-o din nou.">Expirată</div>
+                                : p.status === 'done'
                                 ? <img src={urlOf(p)} alt="" loading="lazy" />
                                 : p.status === 'error'
                                     ? <div className="photo-err" title={p.error}>Eroare</div>
@@ -156,7 +162,7 @@ export default function PhotoUploader({ draftId, initial = [], onChange, apiBase
                                         <span className="photo-pct">{p.progress}%</span>
                                       </div>}
 
-                            {i === 0 && p.status === 'done' && <span className="photo-cover">Copertă</span>}
+                            {i === 0 && p.status === 'done' && !broken && <span className="photo-cover">Copertă</span>}
                             {p.status !== 'uploading' && (
                                 <button type="button" className="photo-del"
                                         onClick={() => remove(key)} aria-label="Șterge poza">✕</button>
